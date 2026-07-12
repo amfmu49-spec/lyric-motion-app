@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, FileAudio, FileText, ImageIcon, Edit3, MonitorPlay, Loader2, Settings, Maximize, Minimize } from 'lucide-react';
+import { Play, Pause, FileAudio, FileText, ImageIcon, Edit3, Loader2, Settings, Maximize, Minimize } from 'lucide-react';
 import { CanvasRenderer } from './components/CanvasRenderer';
 import type { CanvasRendererRef } from './components/CanvasRenderer';
 import { parseLrc } from './lib/lrcParser';
@@ -14,9 +14,9 @@ function App() {
   const [lyrics, setLyrics] = useState<LyricLine[]>([]);
   const [rawLrc, setRawLrc] = useState('');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [bgMediaUrl, setBgMediaUrl] = useState<string | null>(null);
+  const [bgMediaUrl, setBgMediaUrl] = useState<string | null>(`${import.meta.env.BASE_URL}amuvi_logo.png`);
   const [bgMediaType, setBgMediaType] = useState<'image' | 'video'>('image');
-  const [bgFileName, setBgFileName] = useState<string | null>(null);
+  const [bgFileName, setBgFileName] = useState<string | null>('amuvi_logo.png');
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
@@ -50,6 +50,7 @@ function App() {
     visualizerType: 'none',
     visualizerColor: '#ffffff',
     visualizerSensitivity: 1.0,
+    effectType: 'none',
   });
 
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -86,17 +87,33 @@ function App() {
         setRawLrc(decoded);
         setLyrics(parseLrc(decoded));
         setLrcFileName('Webからインポート.lrc');
-        
-        // Remove the parameter from the URL to clean it up
-        const url = new URL(window.location.href);
-        url.searchParams.delete('lrc');
-        url.hash = '';
-        window.history.replaceState({}, document.title, url.toString());
       } catch (err) {
         console.error('Failed to parse LRC from URL', err);
       }
     }
+
+    // Load audio URL if provided (e.g. Suno MP3 URL from bookmarklet)
+    const audioUrlParam = params.get('audio_url');
+    if (audioUrlParam) {
+      try {
+        const decoded = decodeURIComponent(audioUrlParam);
+        setAudioUrl(decoded);
+        setAudioFileName('Sunoからインポート.mp3');
+      } catch (err) {
+        console.error('Failed to parse audio_url from URL', err);
+      }
+    }
+
+    // Remove parameters from URL to clean it up
+    if (lrcData || audioUrlParam) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('lrc');
+      url.searchParams.delete('audio_url');
+      url.hash = '';
+      window.history.replaceState({}, document.title, url.toString());
+    }
   }, []);
+
 
   const initAudioContext = () => {
     if (!audioContextRef.current && audioRef.current) {
@@ -377,10 +394,23 @@ function App() {
                 <canvas ref={exportCanvasRef} style={{ display: 'none' }} />
               </>
               ) : (
-                <div className="placeholder">
-                  <MonitorPlay size={48} style={{ opacity: 0.5, marginBottom: '1rem' }} />
-                  <p>1. コントロールパネルから音源を選択してください</p>
-                  <p>2. LRC または SRT 形式の字幕ファイルを選択してください</p>
+                <div className="placeholder" style={{ 
+                  position: 'relative', 
+                  width: '100%', 
+                  height: '100%', 
+                  display: 'flex', 
+                  flexDirection: 'column', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  backgroundColor: '#000',
+                  overflow: 'hidden'
+                }}>
+                  {bgMediaUrl && bgMediaType === 'image' && (
+                    <img src={bgMediaUrl} style={{ position: 'absolute', width: '100%', height: '100%', objectFit: 'contain', opacity: 1 }} />
+                  )}
+                  {bgMediaUrl && bgMediaType === 'video' && (
+                    <video src={bgMediaUrl} autoPlay loop muted playsInline style={{ position: 'absolute', width: '100%', height: '100%', objectFit: 'contain', opacity: 1 }} />
+                  )}
                 </div>
               )}
             </div>
@@ -556,7 +586,6 @@ function App() {
                   value={settings.motionType}
                   onChange={(e) => setSettings({...settings, motionType: e.target.value as any})}
                 >
-                  <option value="auto">★ AIオートディレクター (Auto Sync)</option>
                   <option value="mix">★ 全自動ミックス (Auto Mix)</option>
                   <option value="telop">番組テロップ風 (Telop)</option>
                   <option value="slide-up">スライドアップ (Slide-Up)</option>
@@ -564,6 +593,32 @@ function App() {
                   <option value="typewriter">タイプライター (Typewriter)</option>
                   <option value="vocaloid">ボカロ風 (Kinetic)</option>
                   <option value="bounce">ポップ＆バウンス (Bounce)</option>
+                </select>
+              </div>
+
+              <div className="control-group">
+                <label><Settings size={16} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }}/> エフェクト (Effect)</label>
+                <select 
+                  className="select-input"
+                  value={settings.effectType}
+                  onChange={e => setSettings({...settings, effectType: e.target.value as any})}
+                >
+                  <option value="none">なし (None)</option>
+                  <option value="bloom">🌟 グロウ/発光 (Bloom)</option>
+                  <option value="vhs">📼 VHS / レトロ (VHS/Retro)</option>
+                  <option value="rgb-shift">🔴 RGBズレ (RGB Shift)</option>
+                  <option value="glitch">💥 グリッチ (Glitch)</option>
+                  <option value="shake">📳 カメラシェイク (Shake)</option>
+                  <option value="flash">⚡ フラッシュ (Flash)</option>
+                  <option value="cinema">🎬 シネマティック (Cinematic)</option>
+                  <option value="vintage">🎞️ ヴィンテージ (Vintage)</option>
+                  <option value="halftone">🔵 ハーフトーン (Halftone)</option>
+                  <option value="negative">🔄 反転 (Negative)</option>
+                  <option value="rainbow">🌈 レインボー (Rainbow)</option>
+                  <option value="lightning">⚡ 稲妻 (Lightning)</option>
+                  <option value="fire">🔥 炎 (Fire)</option>
+                  <option value="laser">🔆 レーザービーム (Laser)</option>
+                  <option value="fireworks">🎆 花火スパーク (Fireworks)</option>
                 </select>
               </div>
 
@@ -628,58 +683,20 @@ function App() {
               </div>
 
               <div className="control-group" style={{ borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem', marginTop: '1rem' }}>
-                <label style={{ color: '#d97706', fontWeight: 'bold' }}>MVスタイル (Advanced Options)</label>
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  <input 
-                    type="text" 
-                    className="select-input"
-                    style={{ fontSize: '0.85rem' }}
-                    placeholder="曲名 (Song Title)" 
-                    value={settings.songTitle} 
-                    onChange={e => setSettings({...settings, songTitle: e.target.value})}
-                  />
-                  <input 
-                    type="text" 
-                    className="select-input"
-                    style={{ fontSize: '0.85rem' }}
-                    placeholder="アーティスト名 (Artist Name)" 
-                    value={settings.artistName} 
-                    onChange={e => setSettings({...settings, artistName: e.target.value})}
-                  />
-                </div>
-              </div>
-
-              <div className="control-group" style={{ display: 'flex', gap: '1rem' }}>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>オーバーレイ</label>
-                  <select 
-                    className="select-input" 
-                    style={{ fontSize: '0.8rem' }}
-                    value={settings.overlayStyle}
-                    onChange={e => setSettings({...settings, overlayStyle: e.target.value as any})}
-                  >
-                    <option value="none">なし (None)</option>
-                    <option value="intro">イントロ (Intro)</option>
-                    <option value="corner">コーナー (Corner)</option>
-                  </select>
-                </div>
-                <div style={{ flex: 1 }}>
-                  <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>ビジュアライザー</label>
-                  <select 
-                    className="select-input" 
-                    style={{ fontSize: '0.8rem' }}
-                    value={settings.visualizerType}
-                    onChange={e => setSettings({...settings, visualizerType: e.target.value as any})}
-                  >
-                    <option value="none">なし (None)</option>
-                    <option value="particles">パーティクル (Particles)</option>
-                    <option value="waveform">波形 (Waveform)</option>
-                    <option value="bars">バー (Bars)</option>
-                    <option value="circle">サークル波形 (Circle Wave)</option>
-                    <option value="grid">サイバーグリッド (Cyber Grid)</option>
-                  </select>
-                </div>
+                <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>ビジュアライザー</label>
+                <select 
+                  className="select-input" 
+                  style={{ fontSize: '0.8rem' }}
+                  value={settings.visualizerType}
+                  onChange={e => setSettings({...settings, visualizerType: e.target.value as any})}
+                >
+                  <option value="none">なし (None)</option>
+                  <option value="particles">パーティクル (Particles)</option>
+                  <option value="waveform">波形 (Waveform)</option>
+                  <option value="bars">バー (Bars)</option>
+                  <option value="circle">サークル波形 (Circle Wave)</option>
+                  <option value="grid">サイバーグリッド (Cyber Grid)</option>
+                </select>
               </div>
 
               {settings.visualizerType !== 'none' && (

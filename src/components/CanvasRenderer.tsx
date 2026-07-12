@@ -51,6 +51,7 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
   const drawFrameRef = useRef<((timeMs: number) => void) | null>(null);
   const bgVideoRef = useRef<HTMLVideoElement | null>(null);
   const bgImageRef = useRef<HTMLImageElement | null>(null);
+  const offscreenRef = useRef<HTMLCanvasElement | null>(null);
 
   // Load background media
   useEffect(() => {
@@ -567,6 +568,370 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
         ctx.restore();
         } // end if (!isExpired && activeLine.text)
       } // end if (activeIndex >= 0)
+
+      // === Post-Processing Effects ===
+      if (settings.effectType && settings.effectType !== 'none') {
+        if (!offscreenRef.current) {
+          offscreenRef.current = document.createElement('canvas');
+        }
+        const off = offscreenRef.current;
+        if (off.width !== width || off.height !== height) {
+          off.width = width;
+          off.height = height;
+        }
+        const octx = off.getContext('2d');
+        if (octx) {
+          // Copy current frame to offscreen
+          octx.globalCompositeOperation = 'copy';
+          octx.drawImage(canvas, 0, 0);
+
+          // Reset main canvas for compositing
+          ctx.save();
+          ctx.setTransform(1, 0, 0, 1, 0, 0);
+          ctx.clearRect(0, 0, width, height);
+
+          switch (settings.effectType) {
+            case 'bloom':
+              ctx.filter = 'blur(16px) brightness(1.5)';
+              ctx.drawImage(off, 0, 0);
+              ctx.filter = 'none';
+              ctx.globalCompositeOperation = 'screen'; // or lighter
+              ctx.drawImage(off, 0, 0);
+              ctx.globalCompositeOperation = 'source-over';
+              break;
+
+            case 'vhs':
+              // Base image with slight color shift
+              ctx.globalCompositeOperation = 'source-over';
+              ctx.filter = 'contrast(1.2) saturate(1.2)';
+              ctx.drawImage(off, 0, 0);
+              ctx.filter = 'none';
+              // Color shift (RGB Split)
+              ctx.globalCompositeOperation = 'screen';
+              ctx.fillStyle = 'rgba(255,0,0,0.1)';
+              ctx.fillRect(0,0,width,height);
+              ctx.drawImage(off, 4, 0);
+              ctx.fillStyle = 'rgba(0,255,255,0.1)';
+              ctx.fillRect(0,0,width,height);
+              ctx.drawImage(off, -4, 0);
+              ctx.globalCompositeOperation = 'source-over';
+              // Scanlines
+              ctx.fillStyle = 'rgba(0,0,0,0.15)';
+              for(let y=0; y<height; y+=4) {
+                 ctx.fillRect(0, y, width, 2);
+              }
+              // Noise
+              const noiseY = (renderTime * 0.1) % height;
+              ctx.fillStyle = 'rgba(255,255,255,0.05)';
+              ctx.fillRect(0, noiseY, width, 50);
+              break;
+
+            case 'rgb-shift':
+              const shiftAmount = 5 + (energy * 15);
+              ctx.globalCompositeOperation = 'screen';
+              
+              // Red channel shift
+              ctx.save();
+              ctx.translate(shiftAmount, 0);
+              ctx.drawImage(off, 0, 0);
+              ctx.fillStyle = 'rgba(0, 255, 255, 1)';
+              ctx.globalCompositeOperation = 'destination-in';
+              ctx.fillRect(0, 0, width, height);
+              ctx.restore();
+
+              // Blue/Green channel shift
+              ctx.save();
+              ctx.translate(-shiftAmount, 0);
+              ctx.drawImage(off, 0, 0);
+              ctx.fillStyle = 'rgba(255, 0, 0, 1)';
+              ctx.globalCompositeOperation = 'destination-in';
+              ctx.fillRect(0, 0, width, height);
+              ctx.restore();
+
+              // Base image
+              ctx.globalCompositeOperation = 'lighten';
+              ctx.drawImage(off, 0, 0);
+              ctx.globalCompositeOperation = 'source-over';
+              break;
+
+            case 'glitch':
+              ctx.drawImage(off, 0, 0);
+              if (Math.sin(renderTime * 0.01) > 0.8 || energy > 0.8) {
+                const sliceH = 20 + Math.random() * 50;
+                const sliceY = Math.random() * (height - sliceH);
+                const shiftX = (Math.random() - 0.5) * 100 * energy;
+                ctx.drawImage(off, 0, sliceY, width, sliceH, shiftX, sliceY, width, sliceH);
+                // random color overlay on the glitch
+                ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,0,0,0.2)' : 'rgba(0,255,255,0.2)';
+                ctx.fillRect(0, sliceY, width, sliceH);
+              }
+              break;
+
+            case 'shake':
+              const shakeMag = (0.2 + energy) * 20;
+              const sx = (Math.random() - 0.5) * shakeMag;
+              const sy = (Math.random() - 0.5) * shakeMag;
+              ctx.translate(sx, sy);
+              ctx.scale(1.05, 1.05); // slight zoom to hide edges
+              ctx.drawImage(off, -width*0.025, -height*0.025);
+              break;
+
+            case 'flash':
+              ctx.drawImage(off, 0, 0);
+              if (energy > 0.7) {
+                ctx.globalCompositeOperation = 'screen';
+                ctx.fillStyle = `rgba(255,255,255,${(energy - 0.7) * 2})`;
+                ctx.fillRect(0, 0, width, height);
+                ctx.globalCompositeOperation = 'source-over';
+              }
+              break;
+
+            case 'cinema':
+              ctx.filter = 'contrast(1.15) saturate(1.1)';
+              ctx.drawImage(off, 0, 0);
+              ctx.filter = 'none';
+              ctx.fillStyle = '#000000';
+              const barHeight = height * 0.12;
+              ctx.fillRect(0, 0, width, barHeight);
+              ctx.fillRect(0, height - barHeight, width, barHeight);
+              break;
+
+            case 'vintage':
+              ctx.filter = 'sepia(0.6) contrast(1.2) brightness(0.9)';
+              ctx.drawImage(off, 0, 0);
+              ctx.filter = 'none';
+              // Vignette
+              const grad = ctx.createRadialGradient(width/2, height/2, height*0.4, width/2, height/2, height*0.8);
+              grad.addColorStop(0, 'rgba(0,0,0,0)');
+              grad.addColorStop(1, 'rgba(0,0,0,0.8)');
+              ctx.fillStyle = grad;
+              ctx.fillRect(0, 0, width, height);
+              // Noise (pseudo)
+              ctx.fillStyle = 'rgba(139, 69, 19, 0.1)';
+              if (Math.floor(renderTime / 50) % 2 === 0) {
+                 ctx.fillRect(0,0,width,height);
+              }
+              break;
+              
+            case 'halftone':
+              ctx.filter = 'contrast(1.5) saturate(1.5)';
+              ctx.drawImage(off, 0, 0);
+              ctx.filter = 'none';
+              ctx.globalCompositeOperation = 'multiply';
+              // Create pseudo dot pattern
+              const dotSize = 6;
+              ctx.fillStyle = '#888';
+              ctx.beginPath();
+              for(let y=0; y<height; y+=dotSize*2) {
+                for(let x=0; x<width; x+=dotSize*2) {
+                  ctx.arc(x, y, dotSize*0.6, 0, Math.PI*2);
+                }
+              }
+              ctx.fill();
+              ctx.globalCompositeOperation = 'source-over';
+              break;
+
+            case 'negative':
+              ctx.filter = 'invert(100%) hue-rotate(180deg)';
+              ctx.drawImage(off, 0, 0);
+              ctx.filter = 'none';
+              break;
+
+            case 'rainbow': {
+              // 虹色オーバーレイが流れる
+              ctx.drawImage(off, 0, 0);
+              const t = renderTime * 0.002;
+              const rainbowGrad = ctx.createLinearGradient(0, 0, width, height);
+              rainbowGrad.addColorStop(0,   `hsla(${(t * 60) % 360}, 100%, 60%, 0.35)`);
+              rainbowGrad.addColorStop(0.2, `hsla(${(t * 60 + 60) % 360}, 100%, 60%, 0.35)`);
+              rainbowGrad.addColorStop(0.4, `hsla(${(t * 60 + 120) % 360}, 100%, 60%, 0.35)`);
+              rainbowGrad.addColorStop(0.6, `hsla(${(t * 60 + 200) % 360}, 100%, 60%, 0.35)`);
+              rainbowGrad.addColorStop(0.8, `hsla(${(t * 60 + 280) % 360}, 100%, 60%, 0.35)`);
+              rainbowGrad.addColorStop(1,   `hsla(${(t * 60 + 360) % 360}, 100%, 60%, 0.35)`);
+              ctx.globalCompositeOperation = 'screen';
+              ctx.fillStyle = rainbowGrad;
+              ctx.fillRect(0, 0, width, height);
+              ctx.globalCompositeOperation = 'source-over';
+              // 光沢ライン
+              ctx.globalCompositeOperation = 'screen';
+              const shineX = ((renderTime * 0.5) % (width + 200)) - 100;
+              const shineGrad = ctx.createLinearGradient(shineX - 80, 0, shineX + 80, 0);
+              shineGrad.addColorStop(0, 'rgba(255,255,255,0)');
+              shineGrad.addColorStop(0.5, 'rgba(255,255,255,0.4)');
+              shineGrad.addColorStop(1, 'rgba(255,255,255,0)');
+              ctx.fillStyle = shineGrad;
+              ctx.fillRect(0, 0, width, height);
+              ctx.globalCompositeOperation = 'source-over';
+              break;
+            }
+
+            case 'lightning': {
+              // 稲妻エフェクト
+              ctx.drawImage(off, 0, 0);
+              const boltChance = energy > 0.5 ? 0.4 : 0.1;
+              if (Math.random() < boltChance || Math.sin(renderTime * 0.03) > 0.85) {
+                const boltCount = Math.floor(1 + energy * 3);
+                for (let b = 0; b < boltCount; b++) {
+                  ctx.save();
+                  ctx.strokeStyle = Math.random() > 0.5
+                    ? `rgba(180,120,255,${0.6 + Math.random() * 0.4})`
+                    : `rgba(100,180,255,${0.6 + Math.random() * 0.4})`;
+                  ctx.lineWidth = 1 + Math.random() * 3;
+                  ctx.shadowColor = ctx.strokeStyle;
+                  ctx.shadowBlur = 20;
+                  ctx.globalCompositeOperation = 'screen';
+                  ctx.beginPath();
+                  let bx = Math.random() * width;
+                  let by = 0;
+                  ctx.moveTo(bx, by);
+                  while (by < height) {
+                    bx += (Math.random() - 0.5) * 120;
+                    by += 20 + Math.random() * 60;
+                    ctx.lineTo(Math.min(Math.max(bx, 0), width), by);
+                  }
+                  ctx.stroke();
+                  ctx.restore();
+                }
+                // 白フラッシュ
+                ctx.globalCompositeOperation = 'screen';
+                ctx.fillStyle = `rgba(200,180,255,${energy * 0.3})`;
+                ctx.fillRect(0, 0, width, height);
+                ctx.globalCompositeOperation = 'source-over';
+              }
+              break;
+            }
+
+            case 'fire': {
+              // 炎エフェクト - 下から燃え上がるオレンジ
+              ctx.filter = 'contrast(1.1) brightness(1.05)';
+              ctx.drawImage(off, 0, 0);
+              ctx.filter = 'none';
+              const fireT = renderTime * 0.003;
+              // 下部に炎グラデーション
+              const fireGrad = ctx.createLinearGradient(0, height * 0.5, 0, height);
+              fireGrad.addColorStop(0, 'rgba(255, 60, 0, 0)');
+              fireGrad.addColorStop(0.5, `rgba(255, 100, 0, ${0.15 + energy * 0.25})`);
+              fireGrad.addColorStop(1, `rgba(255, 160, 0, ${0.3 + energy * 0.4})`);
+              ctx.globalCompositeOperation = 'screen';
+              ctx.fillStyle = fireGrad;
+              ctx.fillRect(0, 0, width, height);
+              // 揺らぐ炎の粒
+              ctx.globalCompositeOperation = 'screen';
+              const particleCount = Math.floor(8 + energy * 20);
+              for (let i = 0; i < particleCount; i++) {
+                const px = (Math.sin(fireT * 2 + i * 1.3) * 0.5 + 0.5) * width;
+                const py = height - (((fireT * 80 + i * 137) % height));
+                const pr = 3 + Math.random() * (6 + energy * 10);
+                const pg = ctx.createRadialGradient(px, py, 0, px, py, pr);
+                pg.addColorStop(0, `rgba(255,240,80,${0.6 + Math.random()*0.3})`);
+                pg.addColorStop(0.5, `rgba(255,80,0,0.4)`);
+                pg.addColorStop(1, 'rgba(255,0,0,0)');
+                ctx.fillStyle = pg;
+                ctx.beginPath();
+                ctx.arc(px, py, pr, 0, Math.PI * 2);
+                ctx.fill();
+              }
+              ctx.globalCompositeOperation = 'source-over';
+              break;
+            }
+
+            case 'laser': {
+              // ネオンレーザービーム
+              ctx.drawImage(off, 0, 0);
+              ctx.save();
+              ctx.globalCompositeOperation = 'screen';
+              const laserT = renderTime * 0.004;
+              const laserCount = 4 + Math.floor(energy * 4);
+              const laserColors = [
+                'rgba(255,0,200,', 'rgba(0,255,200,',
+                'rgba(100,100,255,', 'rgba(255,220,0,',
+                'rgba(0,200,255,', 'rgba(255,80,80,'
+              ];
+              for (let i = 0; i < laserCount; i++) {
+                const angle = (laserT * (0.5 + i * 0.3) + i * (Math.PI / laserCount)) % (Math.PI * 2);
+                const cx2 = width / 2;
+                const cy2 = height / 2;
+                const endX = cx2 + Math.cos(angle) * width;
+                const endY = cy2 + Math.sin(angle) * height;
+                const laserGrad = ctx.createLinearGradient(cx2, cy2, endX, endY);
+                const col = laserColors[i % laserColors.length];
+                laserGrad.addColorStop(0, col + '0.9)');
+                laserGrad.addColorStop(0.5, col + '0.4)');
+                laserGrad.addColorStop(1, col + '0)');
+                ctx.strokeStyle = laserGrad;
+                ctx.lineWidth = 1.5 + energy * 3;
+                ctx.shadowColor = laserColors[i % laserColors.length] + '1)';
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.moveTo(cx2, cy2);
+                ctx.lineTo(endX, endY);
+                ctx.stroke();
+              }
+              ctx.restore();
+              break;
+            }
+
+            case 'fireworks': {
+              // 花火・スパークルエフェクト
+              ctx.drawImage(off, 0, 0);
+              ctx.save();
+              ctx.globalCompositeOperation = 'screen';
+              const fwT = renderTime * 0.001;
+              const sparkCount = Math.floor(6 + energy * 30);
+              const fwColors = [
+                [255,220,50], [255,100,200], [100,220,255],
+                [200,255,100], [255,150,50], [180,100,255]
+              ];
+              for (let i = 0; i < sparkCount; i++) {
+                const seed = i * 7.3 + fwT;
+                const spx = (Math.sin(seed * 1.7) * 0.5 + 0.5) * width;
+                const spy = (Math.cos(seed * 2.3) * 0.5 + 0.5) * height;
+                const spr = 1.5 + Math.random() * (3 + energy * 6);
+                const [r, g, b] = fwColors[i % fwColors.length];
+                const alpha = 0.5 + Math.random() * 0.5;
+                const spg = ctx.createRadialGradient(spx, spy, 0, spx, spy, spr * 2);
+                spg.addColorStop(0, `rgba(${r},${g},${b},${alpha})`);
+                spg.addColorStop(0.4, `rgba(${r},${g},${b},${alpha * 0.5})`);
+                spg.addColorStop(1, `rgba(${r},${g},${b},0)`);
+                ctx.fillStyle = spg;
+                ctx.beginPath();
+                ctx.arc(spx, spy, spr * 2, 0, Math.PI * 2);
+                ctx.fill();
+                // 十字スパーク
+                if (Math.random() < 0.3 + energy * 0.4) {
+                  ctx.strokeStyle = `rgba(${r},${g},${b},${alpha * 0.8})`;
+                  ctx.lineWidth = 0.8;
+                  ctx.shadowColor = `rgba(${r},${g},${b},1)`;
+                  ctx.shadowBlur = 8;
+                  const sl = spr * 3;
+                  ctx.beginPath();
+                  ctx.moveTo(spx - sl, spy); ctx.lineTo(spx + sl, spy);
+                  ctx.moveTo(spx, spy - sl); ctx.lineTo(spx, spy + sl);
+                  ctx.stroke();
+                }
+              }
+              // 爆発リング（高エネルギー時）
+              if (energy > 0.6) {
+                const ringR = 30 + energy * 80;
+                const rg = ctx.createRadialGradient(width/2, height/2, ringR * 0.7, width/2, height/2, ringR);
+                rg.addColorStop(0, `rgba(255,255,200,${(energy - 0.6) * 0.5})`);
+                rg.addColorStop(1, 'rgba(255,200,50,0)');
+                ctx.fillStyle = rg;
+                ctx.beginPath();
+                ctx.arc(width/2, height/2, ringR, 0, Math.PI * 2);
+                ctx.fill();
+              }
+              ctx.restore();
+              break;
+            }
+
+            default:
+              ctx.drawImage(off, 0, 0);
+          }
+          ctx.restore();
+        }
+      }
+
   }, [lyrics, settings, customConfigs, bgMediaUrl, bgMediaType, getAudioEnergy]);
 
   // Store latest drawFrame reference

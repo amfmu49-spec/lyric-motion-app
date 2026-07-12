@@ -13,6 +13,7 @@ export interface AppSettings {
   visualizerType: 'none' | 'particles' | 'waveform' | 'bars' | 'circle' | 'grid';
   visualizerColor: string;
   visualizerSensitivity: number;
+  effectType: 'none' | 'vhs' | 'rgb-shift' | 'glitch' | 'shake' | 'bloom' | 'flash' | 'cinema' | 'vintage' | 'halftone' | 'negative' | 'rainbow' | 'lightning' | 'fire' | 'laser' | 'fireworks';
 }
 
 export const FONTS = [
