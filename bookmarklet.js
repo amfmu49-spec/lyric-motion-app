@@ -40,7 +40,40 @@
         return lrcLines.join("\n");
     }
 
-    function showUI(lrcStr, errorMsg) {
+    function processSrt(rawLyrics) {
+        let r = 0;
+        let srtLines = [];
+        let index = 1;
+        for (let l of rawLyrics) {
+            let start = typeof l.start_s === "number" ? l.start_s : r;
+            let end = typeof l.end_s === "number" ? l.end_s : start + 2.5;
+            r = end;
+            
+            let text = l.text || l.word || "";
+            if (Array.isArray(l.words) && l.words.length > 0) {
+                text = l.words.map(w => w.text || w.word || "").join("");
+            }
+            text = text.replace(/\r/g, "").trim();
+            
+            if (text.length > 0) {
+                let formatTime = (t) => {
+                    let h = Math.floor(t / 3600).toString().padStart(2, "0");
+                    let m = Math.floor((t % 3600) / 60).toString().padStart(2, "0");
+                    let s = Math.floor(t % 60).toString().padStart(2, "0");
+                    let ms = Math.floor((t % 1) * 1000).toString().padStart(3, "0");
+                    return `${h}:${m}:${s},${ms}`;
+                };
+                srtLines.push(index.toString());
+                srtLines.push(`${formatTime(start)} --> ${formatTime(end)}`);
+                srtLines.push(text);
+                srtLines.push("");
+                index++;
+            }
+        }
+        return srtLines.join("\n");
+    }
+
+    function showUI(lrcStr, errorMsg, rawData) {
         let existing = document.getElementById("suno-lrc-bm-overlay");
         if (existing) existing.remove();
 
@@ -105,17 +138,18 @@
             };
 
             let downloadBtn = document.createElement("button");
-            downloadBtn.textContent = "LRC保存";
+            downloadBtn.textContent = "SRT保存";
             Object.assign(downloadBtn.style, {
                 flex: "1", padding: "12px", background: "#3b82f6", color: "#fff",
                 border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer"
             });
             downloadBtn.onclick = () => {
-                let blob = new Blob([lrcStr], { type: "text/lrc" });
+                let srtStr = processSrt(rawData);
+                let blob = new Blob([srtStr], { type: "text/srt" });
                 let url = URL.createObjectURL(blob);
                 let a = document.createElement("a");
                 a.href = url;
-                a.download = `suno-lyrics-${Date.now()}.lrc`;
+                a.download = `suno-lyrics-${Date.now()}.srt`;
                 a.click();
                 URL.revokeObjectURL(url);
             };
@@ -139,21 +173,21 @@
     }
 
     let path = window.location.pathname;
-    if (!path.startsWith("/song/")) return showUI(null, "Not a Suno song page. Please open a song page first (e.g. suno.com/song/...).");
+    if (!path.startsWith("/song/")) return showUI(null, "Not a Suno song page. Please open a song page first (e.g. suno.com/song/...).", null);
     let songId = path.split("/").pop();
-    if (!songId) return showUI(null, "Could not detect song ID.");
+    if (!songId) return showUI(null, "Could not detect song ID.", null);
     let token = getCookie("__session");
-    if (!token) return showUI(null, "Please log in to Suno first.");
+    if (!token) return showUI(null, "Please log in to Suno first.", null);
 
     try {
         let data = await fetchSuno(`/api/gen/${songId}/aligned_lyrics/v2/`, token);
-        if (!data) return showUI(null, "Failed to fetch lyrics data. The API might have changed.");
+        if (!data) return showUI(null, "Failed to fetch lyrics data. The API might have changed.", null);
         let raw = Array.isArray(data.aligned_lyrics) ? data.aligned_lyrics : (data.data?.aligned_lyrics || []);
-        if (!raw.length) return showUI(null, "This song does not have timed lyrics available yet.");
+        if (!raw.length) return showUI(null, "This song does not have timed lyrics available yet.", null);
         
         let lrcStr = processLyrics(raw);
-        showUI(lrcStr, null);
+        showUI(lrcStr, null, raw);
     } catch (err) {
-        showUI(null, "Error: " + err.message);
+        showUI(null, "Error: " + err.message, null);
     }
 })();
