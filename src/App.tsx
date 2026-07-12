@@ -70,17 +70,15 @@ function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
-  // Parse LRC from URL hash if provided (e.g. from Bookmarklet)
+  // Parse LRC from URL hash or search (e.g. from Bookmarklet)
   useEffect(() => {
-    let lrcData = null;
-    
     // Check both search and hash for backward compatibility and flexibility
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('lrc')) {
-      lrcData = params.get('lrc');
-    } else if (window.location.hash.startsWith('#lrc=')) {
-      lrcData = window.location.hash.substring(5);
-    }
+    // Hash is preferred for large payloads to avoid 414 URI Too Long errors
+    const searchParams = new URLSearchParams(window.location.search);
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+
+    const lrcData = searchParams.get('lrc') || hashParams.get('lrc');
+    const audioUrlParam = searchParams.get('audio_url') || hashParams.get('audio_url');
 
     if (lrcData) {
       try {
@@ -93,8 +91,6 @@ function App() {
       }
     }
 
-    // Load audio URL if provided (e.g. Suno MP3 URL from bookmarklet)
-    const audioUrlParam = params.get('audio_url');
     if (audioUrlParam) {
       try {
         const decoded = decodeURIComponent(audioUrlParam);
@@ -108,8 +104,7 @@ function App() {
     // Remove parameters from URL to clean it up
     if (lrcData || audioUrlParam) {
       const url = new URL(window.location.href);
-      url.searchParams.delete('lrc');
-      url.searchParams.delete('audio_url');
+      url.search = '';
       url.hash = '';
       window.history.replaceState({}, document.title, url.toString());
     }
