@@ -1,13 +1,63 @@
-(()=>{function v(t){return typeof t=="number"&&Number.isFinite(t)}function z(t){return Math.round(t*1e3)/1e3}function x(t){return t.replace(/\r/g,"").replace(/[\u200B-\u200D\u2060\uFEFF]/g,"").trim()}function w(t){return x(t).toLowerCase().replace(/\s+/g,"").replace(/[.,!?;:\uFF0C\u3002\uFF01\uFF1F\uFF1B\uFF1A\u3001'"\u201C\u201D\u2018\u2019`~\u00B7\-\u2014()\[\]{}]/g,"")}function E(t){let e=x(t);return/^\[.*\]$/.test(e)||/^\(.*\)$/.test(e)||/^\uFF08.*\uFF09$/.test(e)}var G=new Set(["adlib","adlibs","announcer","band","bass","break","bridge","build","buildup","choir","chorus","climax","crescendo","delay","drop","drum","drums","duet","echo","end","ending","escalate","fade","fading","female","finish","guitar","harmonies","harmony","hook","hum","humming","instrumental","instrumentale","instruments","interlude","intro","jam","lyrics","male","melodic","narrator","outro","piano","postchorus","prechorus","rap","refrain","reprise","reverb","sax","saxophone","shouted","singing","solo","softly","spoken","strings","sung","synth","tension","verse","vocal","vocals","whisper","whispered","word"]);function H(t){return x(t).toLowerCase().replace(/pre[\s-]+chorus/g,"prechorus").replace(/post[\s-]+chorus/g,"postchorus").match(/[a-z0-9]+/g)??[]}function Y(t){let e=H(t);return e.length===0?!1:e.some(r=>G.has(r))}function J(t){let e=x(t),r=e[0],o={"[":{close:"]",requiresKnownTag:!1},"(":{close:")",requiresKnownTag:!0},"\uFF08":{close:"\uFF09",requiresKnownTag:!0}}[r];if(!o)return;let a=e.indexOf(o.close,1);if(!(a<0))return{content:e.slice(1,a),rest:e.slice(a+o.close.length),requiresKnownTag:o.requiresKnownTag}}function Q(t){let e=x(t);for(;e.length>0;){let r=J(e);if(!r)break;let n=x(r.content);if(!n||r.requiresKnownTag&&!Y(n))break;e=x(r.rest)}return e}function j(t){return t.map(e=>({text:Q(e.text),start_s:e.start_s,end_s:e.end_s})).filter(e=>e.text.length>0)}function V(t){let e=x(t);return e.length>0&&/^[\s.,!?;:\uFF0C\u3002\uFF01\uFF1F\uFF1B\uFF1A\u3001'"\u201C\u201D\u2018\u2019`\u00B7\-\u2013\u2014()\[\]{}]+$/.test(e)}function X(t){return/[.,!?;:\uFF0C\u3002\uFF01\uFF1F\uFF1B\uFF1A\u3001'"\u201C\u201D\u2018\u2019`\)\]\}]$/.test(x(t))}function Z(t){return x(t).match(/\p{L}/gu)??[]}function tt(t){let e=x(t);return/\p{L}$/u.test(e)}function et(t){let e=Z(t);if(e.length===0)return!1;let r=e[0];return r===r.toLocaleLowerCase()&&r!==r.toLocaleUpperCase()}function D(t){return w(t).length}function O(t){if(t.length===0)return 0;let e=[...t].sort((n,o)=>n-o),r=Math.floor(e.length/2);return e.length%2===0?(e[r-1]+e[r])/2:e[r]}function nt(t){let e=t.filter(n=>!E(n.text)).map(n=>{let o=D(n.text),a=n.end_s-n.start_s;if(!(o<=0||a<=.1))return a/o}).filter(n=>v(n)&&n>0);if(e.length===0)return .22;let r=O(e);return Math.min(.45,Math.max(.08,r))}function rt(t,e){if(E(t))return .35;let n=Math.max(1,D(t))*e;return Math.min(5,Math.max(.7,n))}function P(t){return t.split(/\r?\n/).map(e=>x(e)).filter(e=>e.length>0)}function B(t,e){if(!v(t.end_s)||!v(e.start_s))return!1;let r=e.start_s-t.end_s;return e.start_s+.05>=t.start_s&&r<=.35}function ot(t,e){if(E(t.text)||E(e.text)||!B(t,e))return!1;if(V(e.text))return!0;let r=D(e.text);return r<=0||r>3?!1:e.end_s-e.start_s<=.85&&tt(t.text)&&et(e.text)&&(r===1||X(e.text))}function it(t,e){return{text:`${x(t.text)}${x(e.text)}`,start_s:t.start_s,end_s:z(Math.max(t.end_s,e.end_s,t.start_s+.02))}}function st(t,e,r){if(t)for(let n=r;n<e.length;n+=1){let o=e[n];if(o){if(o===t)return{index:n,exact:!0};if(t.length>=5&&o.startsWith(t))return{index:n,exact:!1}}}}function at(t,e,r){let n=w(t[e].text),o=t[e],a=o.end_s;for(let c=e+1;c<t.length;c+=1){let i=t[c];if(E(i.text)||!B(o,i))break;let u=w(i.text);if(!u)break;let s=n+u;if(!r.startsWith(s))break;if(n=s,a=Math.max(a,i.end_s),o=i,n===r)return{endIndex:c,end_s:z(a)}}}function R(t,e){if(t.length===0)return[];let r=e?P(e):[],n=r.map(c=>w(c)),o=[],a=0;for(let c=0;c<t.length;c+=1){let i={text:x(t[c].text),start_s:t[c].start_s,end_s:t[c].end_s};if(!i.text)continue;let u=w(i.text),s=st(u,n,a);if(s&&!s.exact){let l=at(t,c,n[s.index]);if(l){o.push({text:r[s.index],start_s:i.start_s,end_s:l.end_s}),a=s.index+1,c=l.endIndex;continue}}let b=o[o.length-1];if(b&&ot(b,i)){o[o.length-1]=it(b,i);continue}o.push(i),s?.exact&&(a=s.index+1)}return o}function ut(t,e){if(t.length===0)return[];let r=t.map(i=>({text:x(i.text),start_s:v(i.start_s)?i.start_s:0})),n=r.slice(1).map((i,u)=>i.start_s-r[u].start_s).filter(i=>i>.05),o=n.length>0?O(n):2.5,a=[],c=0;return r.forEach((i,u)=>{if(!i.text)return;let s=Math.max(0,i.start_s);u>0&&s<c&&(s=c),v(e)&&s>e&&(s=e),a.push({text:i.text,start_s:z(s)}),c=s}),a.length===0?[]:a.map((i,u)=>{let s=u<a.length-1?a[u+1].start_s:i.start_s+o;return v(e)&&s>e&&(s=e),s<i.start_s+.02&&(s=i.start_s+.02),{text:i.text,start_s:i.start_s,end_s:z(s)}})}function W(t,e,r){if(!e||t.length<2)return{lines:t,insertedCount:0};let n=P(e);if(n.length===0)return{lines:t,insertedCount:0};let o=nt(t),a=t.map(g=>({text:x(g.text),start_s:g.start_s})),c=n.map(g=>w(g)),i=0,u=a.map(g=>{let m=w(g.text);if(!m)return-1;for(let d=i;d<c.length;d+=1){let p=c[d];if(p&&(p===m||p.includes(m)||m.includes(p)))return i=d+1,d}return-1}),s=u.findIndex(g=>g>=0);if(s<0)return{lines:t,insertedCount:0};let b=(g,m,d,p)=>{if(m.length===0)return 0;let y=.18,_=Math.max(0,p-d);if(_<=y)return 0;let f=m.map(T=>Math.max(y,rt(T,o))),h=f.reduce((T,C)=>T+C,0),M=m.length*y,K=_/Math.max(h,1e-6);if(_<M||K<.55)return 0;if(h>_){let T=_/h;for(let C=0;C<f.length;C+=1)f[C]=Math.max(y,f[C]*T);h=f.reduce((C,S)=>C+S,0)}if(h>_){let T=h-_,C=f.reduce((S,$)=>S+Math.max(0,$-y),0);if(C>0&&T>0)for(let S=0;S<f.length;S+=1){let $=Math.max(0,f[S]-y),q=Math.min($,$/C*T);f[S]-=q}h%3h=f.reduce((S,$)=>S+$,0)}let A=Math.max(d,p-h);return m.forEach((T,C)=>{g.push({text:T,start_s:A}),A+=f[C]}),m.length},l=[],L=-1,F=0;for(let g=0;g<a.length;g+=1){let m=a[g],d=u[g];if(g===s&&d>0){let p=n.slice(0,d),y=w(m.text),_=p.filter(f=>w(f)!==y);if(_.length>0){let f=m.start_s,h=Math.max(1.2,_.length*.9),M=Math.max(0,f-h);F+=b(l,_,M,f)}}if(d>=0&&L>=0&&d-L>1){let p=n.slice(L+1,d),y=w(m.text),_=l.length>0?w(l[l.length-1].text):"",f=p.filter(h=>{let M=w(h);return M.length>0&&M!==_&&M!==y});if(f.length>0){let h=m.start_s,M=l.length>0?l[l.length-1].start_s:Math.max(0,h-Math.max(1,f.length*.9));F+=b(l,f,M,h)}}l.push(m),d>=0&&(L=d)}return F===0?{lines:t,insertedCount:0}:{lines:ut(l,r),insertedCount:F}}function ct(t){let r=`; ${document.cookie}`.split(`; ${t}=`);if(r.length>=2)return r[r.length-1].split(";").shift()}async function I(t,e){try{let r=await fetch(`https://studio-api.prod.suno.com${t}`,{headers:{Authorization:`Bearer ${e}`}});return r.ok?await r.json():null}catch(r){return console.error(r),null}}function N(t){return typeof t=="number"&&Number.isFinite(t)}function dt(t){return t.replace(/\r/g,"").replace(/[\u200B-\u200D\u2060\uFEFF]/g,"").trim()}function lt(t){let e=typeof t.text=="string"&&t.text||typeof t.word=="string"&&t.word||(Array.isArray(t.words)&&t.words.length>0?t.words.map(n=>typeof n.text=="string"?n.text:n.word??"").join(""):""),r=dt(e);return r.length>0?r:""}function gt(t,e){let r=0;return t.map(n=>{let o=N(n.start_s)?n.start_s:r,a=N(n.end_s)?n.end_s:o+2.5;return r=o,{text:lt(n),start_s:Math.max(0,o),end_s:Math.max(0,a)}}).filter(n=>n.text.length>0)}function mt(t){let e=Math.floor(t/60),r=Math.floor(t%60),n=Math.floor(t%1*100);return`[${e.toString().padStart(2,"0")}:${r.toString().padStart(2,"0")}.${n.toString().padStart(2,"0")}]`}function U(t){let e=Math.floor(t/3600),r=Math.floor(t%3600/60),n=Math.floor(t%60),o=Math.floor(t%1*1e3);return`${e.toString().padStart(2,"0")}:${r.toString().padStart(2,"0")}:${n.toString().padStart(2,"0")},${o.toString().padStart(3,"0")}`}function k(t,e){
-    if(e) {
-        alert(e);
-    } else {
-        let s = t.map(d => {
-            let m = Math.floor(d.start_s/60).toString().padStart(2,"0");
-            let sec = Math.floor(d.start_s%60).toString().padStart(2,"0");
-            let ms = Math.floor((d.start_s%1)*100).toString().padStart(2,"0");
-            return `[${m}:${sec}.${ms}]${d.text}`;
-        }).join("\n");
-        window.location.href = "https://amfmu49-spec.github.io/lyric-motion-app/#lrc=" + encodeURIComponent(s);
+(async () => {
+    // Basic utility functions needed
+    function getCookie(name) {
+        let parts = `; ${document.cookie}`.split(`; ${name}=`);
+        if (parts.length >= 2) return parts.pop().split(';').shift();
     }
-}}async function ft(){let t=window.location.pathname;if(!t.startsWith("/song/"))return k(null,"Not a Suno song page. Please open a song page first (e.g. suno.com/song/...).");let e=t.split("/").pop();if(!e)return k(null,"Could not detect song ID.");let r=ct("__session");if(!r)return k(null,"Please log in to Suno first.");try{let n=await I(`/api/gen/${e}/aligned_lyrics/v2/`,r);if(!n)return k(null,"Failed to fetch lyrics data. The API might have changed.");let o=Array.isArray(n.aligned_lyrics)?n.aligned_lyrics:n.data?.aligned_lyrics||[];if(!o.length)return k(null,"This song does not have timed lyrics available yet.");let a=await I(`/api/clip/${e}`,r),c=a?.metadata?.duration,i=a?.metadata?.prompt,u=gt(o,c),s=R(u,i),b=W(s,i,c),l=R(b.lines,i),L=j(l);k(L)}catch(n){k(null,`Error: ${n.message}`)}}ft();
+    
+    async function fetchSuno(path, token) {
+        try {
+            let res = await fetch(`https://studio-api.prod.suno.com${path}`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            return res.ok ? await res.json() : null;
+        } catch (e) {
+            console.error(e);
+            return null;
+        }
+    }
+
+    function processLyrics(rawLyrics) {
+        // Simple processing, just output LRC
+        let r = 0;
+        let lrcLines = [];
+        for (let l of rawLyrics) {
+            let start = typeof l.start_s === "number" ? l.start_s : r;
+            let end = typeof l.end_s === "number" ? l.end_s : start + 2.5;
+            r = start;
+            
+            let text = l.text || l.word || "";
+            if (Array.isArray(l.words) && l.words.length > 0) {
+                text = l.words.map(w => w.text || w.word || "").join("");
+            }
+            text = text.replace(/\r/g, "").trim();
+            
+            if (text.length > 0) {
+                let min = Math.floor(start / 60).toString().padStart(2, "0");
+                let sec = Math.floor(start % 60).toString().padStart(2, "0");
+                let ms = Math.floor((start % 1) * 100).toString().padStart(2, "0");
+                lrcLines.push(`[${min}:${sec}.${ms}]${text}`);
+            }
+        }
+        return lrcLines.join("\n");
+    }
+
+    let path = window.location.pathname;
+    if (!path.startsWith("/song/")) return alert("Not a Suno song page. Please open a song page first (e.g. suno.com/song/...).");
+    let songId = path.split("/").pop();
+    if (!songId) return alert("Could not detect song ID.");
+    let token = getCookie("__session");
+    if (!token) return alert("Please log in to Suno first.");
+
+    try {
+        let data = await fetchSuno(`/api/gen/${songId}/aligned_lyrics/v2/`, token);
+        if (!data) return alert("Failed to fetch lyrics data. The API might have changed.");
+        let raw = Array.isArray(data.aligned_lyrics) ? data.aligned_lyrics : (data.data?.aligned_lyrics || []);
+        if (!raw.length) return alert("This song does not have timed lyrics available yet.");
+        
+        let lrcStr = processLyrics(raw);
+        window.location.href = "https://amfmu49-spec.github.io/lyric-motion-app/#lrc=" + encodeURIComponent(lrcStr);
+    } catch (err) {
+        alert("Error: " + err.message);
+    }
+})();
