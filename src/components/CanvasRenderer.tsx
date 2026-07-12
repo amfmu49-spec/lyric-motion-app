@@ -349,8 +349,10 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
             for(let i=0; i<lineText.length; i++) {
                 const c = lineText[i];
                 let s = 1;
-                if (KANA_REGEX.test(c)) s = 0.5;
-                else if (!KANJI_REGEX.test(c)) s = 0.7;
+                if (settings.kanjiEmphasis) {
+                  if (KANA_REGEX.test(c)) s = 0.5;
+                  else if (!KANJI_REGEX.test(c)) s = 0.7;
+                }
                 lineLen += s;
             }
             maxLineUnits = Math.max(maxLineUnits, lineLen);
@@ -408,8 +410,10 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
           const charSizes = chars.map((c, i) => {
             const charIdx = globalCharIndex + i;
             let s = baseSize;
-            if (KANA_REGEX.test(c)) s = baseSize * 0.5;
-            else if (!KANJI_REGEX.test(c)) s = baseSize * 0.7;
+            if (settings.kanjiEmphasis) {
+              if (KANA_REGEX.test(c)) s = baseSize * 0.5;
+              else if (!KANJI_REGEX.test(c)) s = baseSize * 0.7;
+            }
 
             // Char level override
             if (customLineConf?.chars?.[charIdx]?.fontSize) {

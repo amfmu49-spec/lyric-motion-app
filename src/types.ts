@@ -14,6 +14,7 @@ export interface AppSettings {
   visualizerColor: string;
   visualizerSensitivity: number;
   effectType: 'none' | 'vhs' | 'rgb-shift' | 'glitch' | 'shake' | 'bloom' | 'flash' | 'cinema' | 'vintage' | 'halftone' | 'negative' | 'rainbow' | 'lightning' | 'fire' | 'laser' | 'fireworks';
+  kanjiEmphasis: boolean;
 }
 
 export const FONTS = [

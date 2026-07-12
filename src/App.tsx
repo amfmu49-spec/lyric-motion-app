@@ -51,6 +51,7 @@ function App() {
     visualizerColor: '#ffffff',
     visualizerSensitivity: 1.0,
     effectType: 'none',
+    kanjiEmphasis: true,
   });
 
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -620,6 +621,18 @@ function App() {
                   <option value="laser">🔆 レーザービーム (Laser)</option>
                   <option value="fireworks">🎆 花火スパーク (Fireworks)</option>
                 </select>
+              </div>
+
+              <div className="control-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '10px' }}>
+                <label style={{ margin: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <input
+                    type="checkbox"
+                    checked={settings.kanjiEmphasis}
+                    onChange={e => setSettings({...settings, kanjiEmphasis: e.target.checked})}
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                  漢字強調 (非漢字を小さく)
+                </label>
               </div>
 
               <div className="control-group">
