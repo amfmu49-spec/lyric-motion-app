@@ -68,10 +68,18 @@ function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
 
-  // Parse LRC from URL if provided (e.g. from Bookmarklet)
+  // Parse LRC from URL hash if provided (e.g. from Bookmarklet)
   useEffect(() => {
+    let lrcData = null;
+    
+    // Check both search and hash for backward compatibility and flexibility
     const params = new URLSearchParams(window.location.search);
-    const lrcData = params.get('lrc');
+    if (params.get('lrc')) {
+      lrcData = params.get('lrc');
+    } else if (window.location.hash.startsWith('#lrc=')) {
+      lrcData = window.location.hash.substring(5);
+    }
+
     if (lrcData) {
       try {
         const decoded = decodeURIComponent(lrcData);
@@ -82,6 +90,7 @@ function App() {
         // Remove the parameter from the URL to clean it up
         const url = new URL(window.location.href);
         url.searchParams.delete('lrc');
+        url.hash = '';
         window.history.replaceState({}, document.title, url.toString());
       } catch (err) {
         console.error('Failed to parse LRC from URL', err);
