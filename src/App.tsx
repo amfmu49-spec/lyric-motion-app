@@ -57,16 +57,37 @@ function App() {
   const playerAreaRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<CanvasRendererRef>(null);
   const exportCanvasRef = useRef<HTMLCanvasElement>(null);
-  const workerRef = useRef<Worker | null>(null);
+
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
   const destRef = useRef<MediaStreamAudioDestinationNode | null>(null);
-  const exporterRef = useRef<any>(null);
+  const exporterRef = useRef<VideoExporter | null>(null);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+
+  // Parse LRC from URL if provided (e.g. from Bookmarklet)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const lrcData = params.get('lrc');
+    if (lrcData) {
+      try {
+        const decoded = decodeURIComponent(lrcData);
+        setRawLrc(decoded);
+        setLyrics(parseLrc(decoded));
+        setLrcFileName('Webからインポート.lrc');
+        
+        // Remove the parameter from the URL to clean it up
+        const url = new URL(window.location.href);
+        url.searchParams.delete('lrc');
+        window.history.replaceState({}, document.title, url.toString());
+      } catch (err) {
+        console.error('Failed to parse LRC from URL', err);
+      }
+    }
+  }, []);
 
   const initAudioContext = () => {
     if (!audioContextRef.current && audioRef.current) {
@@ -189,14 +210,6 @@ function App() {
     }
   };
 
-  const getDimensions = (ratio: string) => {
-    switch (ratio) {
-      case '9:16': return { width: 1080, height: 1920 };
-      case '1:1': return { width: 1080, height: 1080 };
-      case '16:9': default: return { width: 1920, height: 1080 };
-    }
-  };
-
   const startExport = async () => {
     if (!canvasRef.current || !audioUrl) {
       alert('準備が完了していません。音源を選択してください。');
@@ -244,43 +257,6 @@ function App() {
     }
   };
 
-  const downloadFromOPFS = async (fileName: string) => {
-    try {
-      const root = await navigator.storage.getDirectory();
-      const fileHandle = await root.getFileHandle(fileName);
-      const file = await fileHandle.getFile();
-      const url = URL.createObjectURL(file);
-      
-      const a = document.createElement('a');
-      a.style.display = 'none';
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      
-      setTimeout(() => {
-        URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      }, 100);
-    } catch (err) {
-      console.error("Failed to download from OPFS", err);
-      alert("ファイルの保存に失敗しました。");
-    }
-  };
-
-  const downloadBlob = (blob: Blob, fileName: string) => {
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.style.display = 'none';
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => {
-      URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    }, 100);
-  };
 
   const stopExport = async () => {
     setIsRecording(false);
@@ -458,7 +434,7 @@ function App() {
                 <div style={{ padding: '0.75rem', backgroundColor: 'rgba(46, 204, 113, 0.1)', border: '1px solid #2ecc71', borderRadius: '8px', textAlign: 'center' }}>
                   <p style={{ color: '#2ecc71', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>✅ 動画の生成が完了しました！</p>
                   
-                  {navigator.share && navigator.canShare && navigator.canShare({ files: [new File([exportedBlob.blob], 'video.mp4', { type: 'video/mp4' })] }) ? (
+                  {('share' in navigator) && typeof navigator.canShare === 'function' && navigator.canShare({ files: [new File([exportedBlob.blob], 'video.mp4', { type: 'video/mp4' })] }) ? (
                     <button 
                       className="btn btn-primary" 
                       style={{ width: '100%', backgroundColor: '#2ecc71', color: '#000', fontWeight: 'bold' }}
