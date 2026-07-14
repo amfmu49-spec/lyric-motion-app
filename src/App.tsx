@@ -234,7 +234,12 @@ function App() {
 
   const startExport = async () => {
     if (!canvasRef.current || !audioUrl) {
-      alert('準備が完了していません。音源を選択してください。');
+      alert('準備ができていません。');
+      return;
+    }
+
+    if (typeof window.VideoEncoder === 'undefined' || typeof window.AudioEncoder === 'undefined') {
+      alert('お使いのブラウザは高画質動画の書き出しに必要な機能(WebCodecs)に対応していません。\niPhoneの場合は iOS 16.4 以上にアップデートするか、PC（Chrome等）をご利用ください。');
       return;
     }
 
