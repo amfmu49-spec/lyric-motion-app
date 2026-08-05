@@ -60,14 +60,21 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
 
   // Load background media
   useEffect(() => {
-    if (bgMediaType === 'slideshow' && bgImages.length > 0) {
-      const loadedImgs: HTMLImageElement[] = [];
-      bgImages.forEach(url => {
+    if (bgMediaType === 'slideshow' && bgImages && bgImages.length > 0) {
+      const loadedImgs: HTMLImageElement[] = new Array(bgImages.length);
+      let loadedCount = 0;
+      bgImages.forEach((url, idx) => {
         const img = new Image();
         img.src = url;
-        img.onload = () => { loadedImgs.push(img); };
+        img.onload = () => {
+          loadedImgs[idx] = img;
+          loadedCount++;
+          if (loadedCount === bgImages.length || loadedCount >= 1) {
+            bgSlideshowImgsRef.current = loadedImgs.filter(Boolean);
+          }
+        };
       });
-      bgSlideshowImgsRef.current = loadedImgs;
+      bgSlideshowImgsRef.current = loadedImgs.filter(Boolean);
     } else if (bgMediaUrl) {
       if (bgMediaType === 'video') {
         const vid = document.createElement('video');
@@ -164,6 +171,51 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
           else containW = height * iRatio;
           
           ctx.drawImage(img, -containW/2, -containH/2, containW, containH);
+        }
+      } else if (bgMediaType === 'slideshow' && bgSlideshowImgsRef.current.length > 0) {
+        const imgs = bgSlideshowImgsRef.current;
+        const intervalMs = 4000;
+        const fadeMs = 800;
+        const totalDuration = imgs.length * intervalMs;
+        const currentProgressMs = renderTime % totalDuration;
+        const index = Math.floor(currentProgressMs / intervalMs) % imgs.length;
+        const nextIndex = (index + 1) % imgs.length;
+        const timeInCurrentSlide = currentProgressMs % intervalMs;
+
+        const drawSingleImage = (img: HTMLImageElement, alpha: number) => {
+          if (!img) return;
+          const nw = img.naturalWidth || img.width;
+          const nh = img.naturalHeight || img.height;
+          if (!nw || !nh) return;
+          
+          const iRatio = nw / nh;
+          const cRatio = width / height;
+
+          let coverW = width * 1.2, coverH = height * 1.2;
+          if (iRatio > cRatio) coverW = (height * 1.2) * iRatio;
+          else coverH = (width * 1.2) / iRatio;
+
+          ctx.save();
+          ctx.globalAlpha = alpha * 0.3;
+          ctx.drawImage(img, -coverW/2, -coverH/2, coverW, coverH);
+          ctx.restore();
+
+          let containW = width, containH = height;
+          if (iRatio > cRatio) containH = width / iRatio;
+          else containW = height * iRatio;
+
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.drawImage(img, -containW/2, -containH/2, containW, containH);
+          ctx.restore();
+        };
+
+        if (timeInCurrentSlide >= (intervalMs - fadeMs) && imgs[nextIndex]) {
+          const fadeProgress = (timeInCurrentSlide - (intervalMs - fadeMs)) / fadeMs;
+          drawSingleImage(imgs[index], 1.0 - fadeProgress);
+          drawSingleImage(imgs[nextIndex], fadeProgress);
+        } else if (imgs[index]) {
+          drawSingleImage(imgs[index], 1.0);
         }
       }
       ctx.restore();
