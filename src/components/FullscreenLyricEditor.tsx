@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Save, Edit3, List, Play, Check } from 'lucide-react';
 import { parseLrc } from '../lib/lrcParser';
 import type { LyricLine } from '../lib/lrcParser';
@@ -22,6 +22,13 @@ export const FullscreenLyricEditor: React.FC<Props> = ({
   const [textVal, setTextVal] = useState(rawLrc);
   const [parsed, setParsed] = useState<LyricLine[]>(() => parseLrc(rawLrc));
   const [isSaved, setIsSaved] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTextVal(rawLrc);
+      setParsed(parseLrc(rawLrc));
+    }
+  }, [isOpen, rawLrc]);
 
   if (!isOpen) return null;
 
