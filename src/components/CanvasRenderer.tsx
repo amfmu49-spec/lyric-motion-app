@@ -197,21 +197,52 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
           let kbPanY = 0;
 
           if (isKenBurns) {
-            const progress = Math.min(1, Math.max(0, slideTimeMs / intervalMs));
-            const isZoomIn = imgIdx % 2 === 0;
-            kbScale = isZoomIn ? 1.0 + (progress * 0.15) : 1.15 - (progress * 0.15);
-            const panDirection = (imgIdx % 3 === 0) ? 1 : (imgIdx % 3 === 1) ? -1 : 0.5;
-            kbPanX = Math.sin(progress * Math.PI * 0.8) * 30 * panDirection * (width / 1920);
-            kbPanY = Math.cos(progress * Math.PI * 0.8) * 20 * panDirection * (height / 1080);
+            // Smooth progress with smooth easing
+            const rawProgress = Math.min(1.0, Math.max(0.0, slideTimeMs / intervalMs));
+            // Cubic ease-in-out for silky smooth motion with no mid-stop
+            const progress = rawProgress < 0.5 
+              ? 2 * rawProgress * rawProgress 
+              : 1 - Math.pow(-2 * rawProgress + 2, 2) / 2;
+
+            // 5 Diverse Motion & Origin Patterns
+            const pattern = Math.abs(imgIdx * 17) % 5;
+            const maxZoom = 0.20; // 20% zoom range
+
+            if (pattern === 0) {
+              // Pattern 0: Zoom in towards Top-Left
+              kbScale = 1.0 + (progress * maxZoom);
+              kbPanX = -progress * width * 0.06;
+              kbPanY = -progress * height * 0.06;
+            } else if (pattern === 1) {
+              // Pattern 1: Zoom out from Bottom-Right
+              kbScale = (1.0 + maxZoom) - (progress * maxZoom);
+              kbPanX = (1 - progress) * width * 0.06;
+              kbPanY = (1 - progress) * height * 0.06;
+            } else if (pattern === 2) {
+              // Pattern 2: Zoom in towards Top-Right
+              kbScale = 1.0 + (progress * maxZoom);
+              kbPanX = progress * width * 0.06;
+              kbPanY = -progress * height * 0.06;
+            } else if (pattern === 3) {
+              // Pattern 3: Zoom out from Bottom-Left
+              kbScale = (1.0 + maxZoom) - (progress * maxZoom);
+              kbPanX = -(1 - progress) * width * 0.06;
+              kbPanY = (1 - progress) * height * 0.06;
+            } else {
+              // Pattern 4: Smooth Horizontal Pan + Gentle Center Pulsing
+              kbScale = 1.08 + Math.sin(progress * Math.PI) * 0.06;
+              kbPanX = (-0.06 + progress * 0.12) * width;
+              kbPanY = Math.cos(progress * Math.PI) * 0.02 * height;
+            }
           }
 
           ctx.save();
           ctx.translate(kbPanX, kbPanY);
           ctx.scale(kbScale, kbScale);
 
-          let coverW = width * 1.25, coverH = height * 1.25;
-          if (iRatio > cRatio) coverW = (height * 1.25) * iRatio;
-          else coverH = (width * 1.25) / iRatio;
+          let coverW = width * 1.35, coverH = height * 1.35;
+          if (iRatio > cRatio) coverW = (height * 1.35) * iRatio;
+          else coverH = (width * 1.35) / iRatio;
 
           ctx.save();
           ctx.globalAlpha = alpha * 0.3;

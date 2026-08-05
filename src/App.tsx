@@ -638,7 +638,7 @@ function App() {
             <h1 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <span>Lyric Motion Creator</span>
               <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', backgroundColor: 'var(--primary-color, #3498db)', color: '#fff', borderRadius: '12px', fontWeight: 'bold' }}>
-                v2.3.0
+                v2.3.1
               </span>
             </h1>
             <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>Android Ready</span>
@@ -968,16 +968,15 @@ function App() {
 
           <div style={{ marginTop: '1rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
             <details style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
-              <summary>ℹ️ バージョン情報 (v2.3.0)</summary>
+              <summary>ℹ️ バージョン情報 (v2.3.1)</summary>
               <div style={{ marginTop: '0.4rem', textAlign: 'left', padding: '0.5rem', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '6px', fontSize: '0.7rem', lineHeight: '1.5' }}>
-                <strong>v2.3.0 主な機能・更新点:</strong><br />
-                • 🎬 ケンバーンズ効果（スライドショー時のゆっくりズーム＆パン移動アニメーション）機能追加<br />
+                <strong>v2.3.1 主な機能・更新点:</strong><br />
+                • 🎬 ケンバーンズ効果の完全滑らか化＆ランダムズーム焦点（左上・右下・右上・左下・水平移動）対応<br />
                 • 🖼️ 複数枚画像スライドショー背景レンダリング完全修正<br />
                 • 🎛️ 本物リアルタイムEQイコライザー（Web Audio API帯域連動）<br />
                 • 🎨 ビジュアライザー100%時の完全ソリッド不透明表示対応<br />
                 • 📱 Android端末正式対応 (WebCodecs & MediaRecorder)<br />
-                • 📝 全画面歌詞エディタ搭載<br />
-                • 🔤 縦書き表示対応 (長音符「ー」90度回転)
+                • 📝 全画面歌詞エディタ搭載
               </div>
             </details>
           </div>
