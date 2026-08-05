@@ -10,7 +10,7 @@ export interface AppSettings {
   songTitle: string;
   artistName: string;
   overlayStyle: 'none' | 'intro' | 'corner';
-  visualizerType: 'none' | 'particles' | 'waveform' | 'bars' | 'circle' | 'grid' | 'shapes' | 'neon-burst';
+  visualizerType: 'none' | 'particles' | 'waveform' | 'bars' | 'circle' | 'grid';
   visualizerColor: string;
   visualizerSensitivity: number;
   visualizerOpacity?: number;

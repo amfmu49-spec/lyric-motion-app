@@ -888,11 +888,9 @@ function App() {
                   onChange={e => setSettings({...settings, visualizerType: e.target.value as any})}
                 >
                   <option value="none">なし (None)</option>
-                  <option value="shapes">★ ランダム幾何学図形 (Random Shapes)</option>
-                  <option value="neon-burst">⚡ ネオンバースト (Neon Burst)</option>
-                  <option value="particles">パーティクル (Particles)</option>
-                  <option value="waveform">波形 (Waveform)</option>
                   <option value="bars">バー (Bars)</option>
+                  <option value="waveform">波形 (Waveform)</option>
+                  <option value="particles">パーティクル (Particles)</option>
                   <option value="circle">サークル波形 (Circle Wave)</option>
                   <option value="grid">サイバーグリッド (Cyber Grid)</option>
                 </select>
