@@ -9,13 +9,16 @@ interface Props {
   customConfigs?: CustomConfigMap;
   getAudioEnergy?: () => number;
   bgMediaUrl: string | null;
-  bgMediaType: 'image' | 'video';
+  bgMediaType: 'image' | 'video' | 'slideshow';
+  bgImages?: string[];
 }
 
 const KANJI_REGEX = /[一-龯]/;
 const KANA_REGEX = /[ぁ-んァ-ン]/;
 const DARK_REGEX = /[狂壊殺闇絶毒死罪罰血]/;
 const POP_REGEX = /[！？!?笑喜愛恋星]/;
+const CHOUON_REGEX = /[ー〜\-―‐]/;
+const SMALL_KANA_REGEX = /[っゃゅょッャュョ,、,。.!！?？]/;
 
 // Easing functions
 const easeOutQuart = (x: number): number => 1 - Math.pow(1 - x, 4);
@@ -34,7 +37,7 @@ export interface CanvasRendererRef extends HTMLCanvasElement {
 }
 
 export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
-  lyrics, currentTime, settings, customConfigs = {}, getAudioEnergy, bgMediaUrl, bgMediaType
+  lyrics, currentTime, settings, customConfigs = {}, getAudioEnergy, bgMediaUrl, bgMediaType, bgImages = []
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
@@ -51,25 +54,35 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
   const drawFrameRef = useRef<((timeMs: number) => void) | null>(null);
   const bgVideoRef = useRef<HTMLVideoElement | null>(null);
   const bgImageRef = useRef<HTMLImageElement | null>(null);
+  const bgSlideshowImgsRef = useRef<HTMLImageElement[]>([]);
   const offscreenRef = useRef<HTMLCanvasElement | null>(null);
 
   // Load background media
   useEffect(() => {
-    if (!bgMediaUrl) return;
-    if (bgMediaType === 'video') {
-      const vid = document.createElement('video');
-      vid.src = bgMediaUrl;
-      vid.crossOrigin = "anonymous";
-      vid.loop = true;
-      vid.muted = true;
-      vid.play();
-      bgVideoRef.current = vid;
-    } else {
-      const img = new Image();
-      img.src = bgMediaUrl;
-      img.onload = () => { bgImageRef.current = img; };
+    if (bgMediaType === 'slideshow' && bgImages.length > 0) {
+      const loadedImgs: HTMLImageElement[] = [];
+      bgImages.forEach(url => {
+        const img = new Image();
+        img.src = url;
+        img.onload = () => { loadedImgs.push(img); };
+      });
+      bgSlideshowImgsRef.current = loadedImgs;
+    } else if (bgMediaUrl) {
+      if (bgMediaType === 'video') {
+        const vid = document.createElement('video');
+        vid.src = bgMediaUrl;
+        vid.crossOrigin = "anonymous";
+        vid.loop = true;
+        vid.muted = true;
+        vid.play();
+        bgVideoRef.current = vid;
+      } else {
+        const img = new Image();
+        img.src = bgMediaUrl;
+        img.onload = () => { bgImageRef.current = img; };
+      }
     }
-  }, [bgMediaUrl, bgMediaType]);
+  }, [bgMediaUrl, bgMediaType, bgImages]);
 
   const drawFrame = useCallback((overrideTimeMs: number) => {
     const canvas = canvasRef.current;
@@ -289,7 +302,7 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
         let fontName = settings.fontFamily;
         let color = settings.textColor;
         let baseSize = settings.fontSize * (width / 800);
-        let isVertical = false;
+        let isVertical = settings.writingMode === 'vertical';
 
         const text = activeLine.text;
         const isAutoMotion = settings.motionType === 'auto';
@@ -308,20 +321,20 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
         if (isAutoMotion || isMixMotion) {
           if (isAutoMotion) {
             if (isShort) motion = 'bounce';
-            else if (isDark) motion = 'vocaloid';
-            else if (isPop) motion = 'slide-up';
-            else if (energy > 0.6) motion = 'slide-up';
-            else if (energy < 0.2) motion = 'cinematic';
-            else motion = ['telop', 'slide-up', 'typewriter', 'cinematic'][activeIndex % 4] as any;
+            else if (isDark) motion = 'glitch';
+            else if (isPop) motion = 'zoom-in';
+            else if (energy > 0.6) motion = 'shake-pop';
+            else if (energy < 0.2) motion = 'fade';
+            else motion = ['telop', 'slide-up', 'typewriter', 'cinematic', 'glitch', 'zoom-in'][activeIndex % 6] as any;
           } else {
-            motion = ['cinematic', 'slide-up', 'bounce', 'vocaloid', 'typewriter'][activeIndex % 5] as any;
+            motion = ['cinematic', 'slide-up', 'bounce', 'vocaloid', 'typewriter', 'glitch', 'fade', 'rotate'][activeIndex % 8] as any;
           }
         }
 
         if (isAutoFont) {
           if (isDark) fontName = "'Reggae One', sans-serif";
           else if (isPop) fontName = "'Mochiy Pop One', sans-serif";
-          else if (energy > 0.6) fontName = "'Rampart One', sans-serif";
+          else if (energy > 0.6) fontName = "'RocknRoll One', sans-serif";
           else if (energy < 0.2) fontName = "'Shippori Mincho', serif";
           else fontName = "'Noto Sans JP', sans-serif";
         }
@@ -337,7 +350,7 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
         if (isShort && isAutoMotion) baseSize *= 2.5;
         else if (isVeryLong) baseSize *= Math.max(0.6, longCutoff / text.length);
 
-        if ((isAutoMotion || isMixMotion) && (activeIndex % 4 === 3) && !isShort) {
+        if (!settings.writingMode && (isAutoMotion || isMixMotion) && (activeIndex % 4 === 3) && !isShort) {
           isVertical = true;
         }
 
@@ -379,14 +392,25 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
           if (customLineConf.motionType) motion = customLineConf.motionType as any;
           if (customLineConf.fontFamily) fontName = customLineConf.fontFamily;
           if (customLineConf.textColor) color = customLineConf.textColor;
-          if (customLineConf.fontSize) baseSize *= customLineConf.fontSize; // multiply by ratio
+          if (customLineConf.fontSize) baseSize *= customLineConf.fontSize;
         }
 
         ctx.save();
-        ctx.translate(width/2, height/2);
+
+        // Calculate Position X & Y offsets based on settings
+        let translateX = width / 2;
+        let translateY = height / 2;
+
+        if (settings.positionX === 'left') translateX = width * 0.25;
+        else if (settings.positionX === 'right') translateX = width * 0.75;
+
+        if (settings.positionY === 'top') translateY = height * 0.25;
+        else if (settings.positionY === 'bottom') translateY = height * 0.75;
+
+        ctx.translate(translateX, translateY);
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        // Enhanced shadows similar to Assam
+        
         ctx.shadowColor = `rgba(0,0,0,0.9)`;
         ctx.shadowBlur = 14 * (width/1000);
         ctx.shadowOffsetX = 0;
@@ -394,7 +418,7 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
 
         const lines = text.split('\n');
         const lineSpacing = 1.5;
-        const lineHeights = lines.map(() => baseSize * lineSpacing); // basic estimation, will be overridden by char sizes
+        const lineHeights = lines.map(() => baseSize * lineSpacing);
         const totalHeight = lineHeights.reduce((a,b)=>a+b, 0);
         
         let startY = -totalHeight / 2 + (baseSize * lineSpacing) / 2;
@@ -415,7 +439,6 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
               else if (!KANJI_REGEX.test(c)) s = baseSize * 0.7;
             }
 
-            // Char level override
             if (customLineConf?.chars?.[charIdx]?.fontSize) {
                s *= customLineConf.chars[charIdx].fontSize!;
             }
@@ -434,7 +457,6 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
           chars.forEach((c, cIdx) => {
             const size = charSizes[cIdx];
             
-            // Apply Custom Config Overrides (Char level)
             let charFont = fontName;
             let charColor = color;
             let charMotion = motion;
@@ -462,11 +484,22 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
             let drawX = charX;
             let drawY = charY;
 
+            const isChouon = CHOUON_REGEX.test(c);
+            const isSmallKana = SMALL_KANA_REGEX.test(c);
+
+            // Handle offsets for vertical layout (punctuation and small characters)
+            if (isVertical) {
+              if (isSmallKana) {
+                drawX += size * 0.2;
+                drawY -= size * 0.2;
+              }
+            }
+
             if (charMotion === 'typewriter') {
               ctx.globalAlpha = enterProgress > 0.5 ? 1 : 0;
               if (exitProgress > 0) ctx.globalAlpha = 1 - exitProgress;
             } else if (charMotion === 'slide-up') {
-              const slideDist = isVertical ? size : size;
+              const slideDist = size;
               const p = easeOutBack(enterProgress);
               if (isVertical) drawX += slideDist * (1 - p);
               else drawY += slideDist * (1 - p);
@@ -483,6 +516,40 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
                  const s = 1 + exitProgress * 0.5;
                  ctx.scale(s, s);
               }
+            } else if (charMotion === 'glitch') {
+              const p = easeOutQuart(enterProgress);
+              const glitchOffset = (Math.random() - 0.5) * size * 0.3 * (1 - p);
+              drawX += glitchOffset;
+              ctx.globalAlpha = Math.min(1, enterProgress * 2);
+              if (exitProgress > 0) ctx.globalAlpha = 1 - exitProgress;
+            } else if (charMotion === 'fade') {
+              const p = easeOutQuart(enterProgress);
+              ctx.globalAlpha = p;
+              if (exitProgress > 0) ctx.globalAlpha = 1 - exitProgress;
+            } else if (charMotion === 'zoom-in') {
+              const p = easeOutBack(enterProgress);
+              ctx.translate(drawX, drawY);
+              const scaleVal = 0.2 + 0.8 * p;
+              ctx.scale(scaleVal, scaleVal);
+              drawX = 0; drawY = 0;
+              ctx.globalAlpha = Math.min(1, enterProgress * 2);
+              if (exitProgress > 0) ctx.globalAlpha = 1 - exitProgress;
+            } else if (charMotion === 'rotate') {
+              const p = easeOutBack(enterProgress);
+              ctx.translate(drawX, drawY);
+              ctx.rotate((1 - p) * (Math.PI / 3));
+              drawX = 0; drawY = 0;
+              ctx.globalAlpha = Math.min(1, enterProgress * 2);
+              if (exitProgress > 0) ctx.globalAlpha = 1 - exitProgress;
+            } else if (charMotion === 'shake-pop') {
+              const p = easeOutElastic(enterProgress);
+              const shakeX = (Math.sin(renderTime * 0.05 + cIdx) * 6) * energy;
+              const shakeY = (Math.cos(renderTime * 0.05 + cIdx) * 6) * energy;
+              ctx.translate(drawX + shakeX, drawY + shakeY);
+              ctx.scale(p, p);
+              drawX = 0; drawY = 0;
+              ctx.globalAlpha = Math.min(1, enterProgress * 2);
+              if (exitProgress > 0) ctx.globalAlpha = 1 - exitProgress;
             } else if (charMotion === 'vocaloid') {
               const p = easeOutQuart(enterProgress);
               const rX = Math.sin(globalCharIndex * 123) * 200;
@@ -515,8 +582,19 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
             ctx.lineJoin = 'round';
             ctx.lineWidth = size * 0.12;
             ctx.strokeStyle = 'rgba(0,0,0,0.4)';
-            ctx.strokeText(c, drawX, drawY);
-            ctx.fillText(c, drawX, drawY);
+
+            // If Vertical mode and Chouon (long dash), rotate character 90 degrees
+            if (isVertical && isChouon) {
+              ctx.save();
+              ctx.translate(drawX, drawY);
+              ctx.rotate(Math.PI / 2);
+              ctx.strokeText(c, 0, 0);
+              ctx.fillText(c, 0, 0);
+              ctx.restore();
+            } else {
+              ctx.strokeText(c, drawX, drawY);
+              ctx.fillText(c, drawX, drawY);
+            }
 
             if (isVertical) {
                charY += size;

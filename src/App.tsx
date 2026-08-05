@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Play, Pause, FileAudio, FileText, ImageIcon, Edit3, Loader2, Settings, Maximize, Minimize } from 'lucide-react';
+import { Play, Pause, FileAudio, FileText, ImageIcon, Edit3, Loader2, Settings, Maximize, Minimize, Expand, Images } from 'lucide-react';
 import { CanvasRenderer } from './components/CanvasRenderer';
 import type { CanvasRendererRef } from './components/CanvasRenderer';
 import { parseLrc } from './lib/lrcParser';
@@ -9,13 +9,15 @@ import { FONTS } from './types';
 import type { AppSettings } from './types';
 import { CustomLeftPanel, CustomRightPanel } from './components/CustomEditor';
 import { VideoExporter } from './lib/VideoExporter';
+import { FullscreenLyricEditor } from './components/FullscreenLyricEditor';
 
 function App() {
   const [lyrics, setLyrics] = useState<LyricLine[]>([]);
   const [rawLrc, setRawLrc] = useState('');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [bgMediaUrl, setBgMediaUrl] = useState<string | null>(`${import.meta.env.BASE_URL}amuvi_logo.png`);
-  const [bgMediaType, setBgMediaType] = useState<'image' | 'video'>('image');
+  const [bgMediaType, setBgMediaType] = useState<'image' | 'video' | 'slideshow'>('image');
+  const [bgImages, setBgImages] = useState<string[]>([]);
   const [bgFileName, setBgFileName] = useState<string | null>('amuvi_logo.png');
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -26,6 +28,7 @@ function App() {
   const [isConverting, setIsConverting] = useState(false);
   const [renderProgress, setRenderProgress] = useState<number | null>(null);
   const [exportedBlob, setExportedBlob] = useState<{ blob: Blob, url: string } | null>(null);
+  const [isFullscreenEditor, setIsFullscreenEditor] = useState(false);
   
   // Mode Selection
   const [appMode, setAppMode] = useState<'EASY' | 'CUSTOM'>('EASY');
@@ -52,6 +55,9 @@ function App() {
     visualizerSensitivity: 1.0,
     effectType: 'none',
     kanjiEmphasis: true,
+    writingMode: 'horizontal',
+    positionX: 'center',
+    positionY: 'center',
   });
 
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -221,8 +227,24 @@ function App() {
     }
   };
 
+  const handleBgMultipleUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const urls: string[] = [];
+      Array.from(files).forEach(file => {
+        urls.push(URL.createObjectURL(file));
+      });
+      setBgImages(urls);
+      setBgMediaType('slideshow');
+      setBgFileName(`${files.length}枚画像(スライドショー)`);
+    }
+  };
+
   const togglePlay = () => {
     if (audioRef.current) {
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume();
+      }
       if (isPlaying) {
         audioRef.current.pause();
       } else {
@@ -232,14 +254,90 @@ function App() {
     }
   };
 
+  const startMediaRecorderExport = () => {
+    if (!canvasRef.current || !audioRef.current || !audioUrl) {
+      alert('準備ができていません。');
+      return;
+    }
+
+    try {
+      setIsRecording(true);
+      setRenderProgress(null);
+      setExportedBlob(null);
+
+      initAudioContext();
+      if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
+        audioContextRef.current.resume();
+      }
+
+      const canvasEl = canvasRef.current as unknown as HTMLCanvasElement;
+      const canvasStream = (canvasEl.captureStream ? canvasEl.captureStream(30) : (canvasEl as any).webkitCaptureStream?.(30)) as MediaStream;
+
+      const stream = new MediaStream();
+      if (canvasStream) {
+        canvasStream.getVideoTracks().forEach(track => stream.addTrack(track));
+      }
+      if (destRef.current) {
+        destRef.current.stream.getAudioTracks().forEach(track => stream.addTrack(track));
+      }
+
+      const mimeTypes = [
+        'video/mp4',
+        'video/webm;codecs=vp9,opus',
+        'video/webm;codecs=vp8,opus',
+        'video/webm',
+      ];
+      let selectedMime = '';
+      for (const m of mimeTypes) {
+        if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(m)) {
+          selectedMime = m;
+          break;
+        }
+      }
+
+      const options = selectedMime ? { mimeType: selectedMime } : undefined;
+      const mediaRecorder = new MediaRecorder(stream, options);
+      mediaRecorderRef.current = mediaRecorder;
+
+      const chunks: Blob[] = [];
+      mediaRecorder.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) {
+          chunks.push(e.data);
+        }
+      };
+
+      mediaRecorder.onstop = () => {
+        const finalBlob = new Blob(chunks, { type: selectedMime || 'video/webm' });
+        const url = URL.createObjectURL(finalBlob);
+        setExportedBlob({ blob: finalBlob, url });
+        setIsRecording(false);
+        setIsConverting(false);
+        mediaRecorderRef.current = null;
+      };
+
+      audioRef.current.currentTime = 0;
+      setCurrentTime(0);
+      audioRef.current.play();
+      setIsPlaying(true);
+
+      mediaRecorder.start(1000);
+    } catch (err: any) {
+      console.error('MediaRecorder Fallback Error:', err);
+      alert('動画のリアルタイム生成を開始できませんでした。');
+      setIsRecording(false);
+      setIsConverting(false);
+    }
+  };
+
   const startExport = async () => {
     if (!canvasRef.current || !audioUrl) {
       alert('準備ができていません。');
       return;
     }
 
+    // Fallback to MediaRecorder directly if WebCodecs is not supported on this browser (e.g. older Android Chrome / WebView)
     if (typeof window.VideoEncoder === 'undefined' || typeof window.AudioEncoder === 'undefined') {
-      alert('お使いのブラウザは高画質動画の書き出しに必要な機能(WebCodecs)に対応していません。\niPhoneの場合は iOS 16.4 以上にアップデートするか、PC（Chrome等）をご利用ください。');
+      startMediaRecorderExport();
       return;
     }
 
@@ -253,11 +351,10 @@ function App() {
       const arrayBuffer = await response.arrayBuffer();
       const decodedBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-      // Create exporter
       exporterRef.current = new VideoExporter(
         canvasRef.current as HTMLCanvasElement,
         (timeMs) => canvasRef.current?.renderFrame(timeMs),
-        arrayBuffer, // Actually we need the original ArrayBuffer to decode again? Wait, we can pass arrayBuffer directly.
+        arrayBuffer,
         decodedBuffer.duration
       );
 
@@ -265,7 +362,6 @@ function App() {
          setRenderProgress(Math.floor(progress * 100));
       });
 
-      // Export finished
       const url = URL.createObjectURL(blob);
       setExportedBlob({ blob, url });
       
@@ -274,16 +370,12 @@ function App() {
       exporterRef.current = null;
 
     } catch (err: any) {
-      console.error(err);
-      if (err.message !== "Aborted") {
-        alert(`動画生成中にエラーが発生しました。\n詳細: ${err.message || err}`);
-      }
-      setIsRecording(false);
-      setRenderProgress(null);
+      console.warn('WebCodecs export failed, falling back to MediaRecorder:', err);
       exporterRef.current = null;
+      // Fallback to MediaRecorder export on Android or unsupported device configs
+      startMediaRecorderExport();
     }
   };
-
 
   const stopExport = async () => {
     setIsRecording(false);
@@ -305,7 +397,7 @@ function App() {
 
   const handleAudioEnded = () => {
     setIsPlaying(false);
-    if (isRecording && exporterRef.current) {
+    if (isRecording) {
       stopExport();
     }
   };
@@ -391,6 +483,7 @@ function App() {
                   getAudioEnergy={getAudioEnergy}
                   bgMediaUrl={bgMediaUrl}
                   bgMediaType={bgMediaType}
+                  bgImages={bgImages}
                 />
                 <canvas ref={exportCanvasRef} style={{ display: 'none' }} />
               </>
@@ -474,33 +567,44 @@ function App() {
                 <div style={{ padding: '0.75rem', backgroundColor: 'rgba(46, 204, 113, 0.1)', border: '1px solid #2ecc71', borderRadius: '8px', textAlign: 'center' }}>
                   <p style={{ color: '#2ecc71', fontSize: '0.85rem', fontWeight: 'bold', marginBottom: '0.5rem' }}>✅ 動画の生成が完了しました！</p>
                   
-                  {('share' in navigator) && typeof navigator.canShare === 'function' && navigator.canShare({ files: [new File([exportedBlob.blob], 'video.mp4', { type: 'video/mp4' })] }) ? (
+                  <video 
+                    src={exportedBlob.url} 
+                    controls 
+                    playsInline 
+                    style={{ width: '100%', maxHeight: '200px', borderRadius: '6px', marginBottom: '0.5rem', backgroundColor: '#000' }}
+                  />
+
+                  {('share' in navigator) && typeof navigator.canShare === 'function' && navigator.canShare({ files: [new File([exportedBlob.blob], 'video.mp4', { type: exportedBlob.blob.type || 'video/mp4' })] }) ? (
                     <button 
                       className="btn btn-primary" 
-                      style={{ width: '100%', backgroundColor: '#2ecc71', color: '#000', fontWeight: 'bold' }}
+                      style={{ width: '100%', backgroundColor: '#2ecc71', color: '#000', fontWeight: 'bold', marginBottom: '0.4rem' }}
                       onClick={async () => {
                         try {
+                          const ext = exportedBlob.blob.type.includes('webm') ? 'webm' : 'mp4';
                           await navigator.share({
-                            files: [new File([exportedBlob.blob], `lyric_motion_${Date.now()}.mp4`, { type: 'video/mp4' })],
+                            files: [new File([exportedBlob.blob], `lyric_motion_${Date.now()}.${ext}`, { type: exportedBlob.blob.type })],
                             title: 'LyricMotion Video'
                           });
                         } catch (err) {
-                          console.log('Share cancelled', err);
+                          console.log('Share cancelled or failed', err);
                         }
                       }}
                     >
-                      📷 カメラロールに保存する
+                      📱 動画を端末・カメラロールに保存 / 共有
                     </button>
                   ) : (
                     <a 
                       href={exportedBlob.url} 
-                      download={`lyric_motion_${Date.now()}.mp4`}
+                      download={`lyric_motion_${Date.now()}.${exportedBlob.blob.type.includes('webm') ? 'webm' : 'mp4'}`}
                       className="btn btn-primary" 
-                      style={{ width: '100%', display: 'block', textDecoration: 'none', backgroundColor: '#2ecc71', color: '#000', fontWeight: 'bold' }}
+                      style={{ width: '100%', display: 'block', textDecoration: 'none', backgroundColor: '#2ecc71', color: '#000', fontWeight: 'bold', marginBottom: '0.4rem' }}
                     >
                       ⬇️ 動画をダウンロード
                     </a>
                   )}
+                  <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)', display: 'block' }}>
+                    ※ Android等で直接ダウンロードできない場合は、上の動画を長押しして保存してください。
+                  </span>
                 </div>
               </div>
             )}
@@ -521,6 +625,16 @@ function App() {
         </div>
 
         <div className="controls-sidebar">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', padding: '0 0.25rem' }}>
+            <h1 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <span>Lyric Motion Creator</span>
+              <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', backgroundColor: 'var(--primary-color, #3498db)', color: '#fff', borderRadius: '12px', fontWeight: 'bold' }}>
+                v2.1.0
+              </span>
+            </h1>
+            <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>Android Ready</span>
+          </div>
+
           <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
             <button 
               className={`btn ${appMode === 'EASY' ? 'btn-primary' : ''}`} 
@@ -539,22 +653,46 @@ function App() {
           </div>
 
           <div className="glass-panel" style={{ padding: '0.75rem', marginBottom: '1rem' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '0.5rem', marginBottom: '0.5rem' }}>
               <div className="file-input-wrapper">
-                <button className="btn btn-primary" style={{ width: '100%', padding: '0.5rem' }} title={audioFileName || '1. 音源'}><FileAudio size={16}/> 音源</button>
+                <button className="btn btn-primary" style={{ width: '100%', padding: '0.5rem' }} title={audioFileName || '1. 音源'}><FileAudio size={16}/> 音源選択</button>
                 <input type="file" accept="audio/*,.mp3,.wav,.m4a,.aac" onChange={handleAudioUpload} />
               </div>
               <div className="file-input-wrapper">
-                <button className="btn btn-primary" style={{ width: '100%', padding: '0.5rem' }} title={bgFileName || '2. 背景'}><ImageIcon size={16}/> 背景</button>
+                <button className="btn btn-primary" style={{ width: '100%', padding: '0.5rem' }} title={bgFileName || '2. 単一背景'}><ImageIcon size={16}/> 単一背景</button>
                 <input type="file" accept="image/*,video/*,.jpg,.jpeg,.png,.mp4,.mov" onChange={handleBgUpload} />
               </div>
               <div className="file-input-wrapper">
-                <button className="btn btn-primary" style={{ width: '100%', padding: '0.5rem' }} title={lrcFileName || '3. 歌詞'}><FileText size={16}/> 歌詞</button>
+                <button className="btn btn-primary" style={{ width: '100%', padding: '0.5rem', backgroundColor: '#8e44ad' }} title="2. 複数画像スライドショー"><Images size={16}/> 複数画像</button>
+                <input type="file" accept="image/*" multiple onChange={handleBgMultipleUpload} />
+              </div>
+              <div className="file-input-wrapper">
+                <button className="btn btn-primary" style={{ width: '100%', padding: '0.5rem' }} title={lrcFileName || '3. 歌詞ファイル'}><FileText size={16}/> 歌詞ファイル</button>
                 <input type="file" onChange={handleLrcUpload} />
               </div>
             </div>
+
+            <button
+              className="btn"
+              onClick={() => setIsFullscreenEditor(true)}
+              style={{
+                width: '100%',
+                padding: '0.5rem',
+                marginTop: '0.5rem',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.4rem',
+                fontWeight: 'bold'
+              }}
+            >
+              <Expand size={16} /> 歌詞を全画面で集中編集する
+            </button>
+
             <details style={{ marginTop: '0.75rem' }}>
-              <summary style={{ cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.85rem' }}><Edit3 size={14} style={{display:'inline', verticalAlign:'middle'}}/> 歌詞を直接編集する</summary>
+              <summary style={{ cursor: 'pointer', color: 'var(--text-secondary)', fontSize: '0.85rem' }}><Edit3 size={14} style={{display:'inline', verticalAlign:'middle'}}/> 歌詞テキストを簡易編集</summary>
               <textarea 
                 className="text-input" 
                 value={rawLrc} 
@@ -568,16 +706,56 @@ function App() {
           {appMode === 'EASY' ? (
             <>
               {/* Settings */}
-              <div className="control-group">
-                <label><Settings size={16} style={{ display: 'inline', marginRight: '4px', verticalAlign: 'text-bottom' }}/> 画面比率 (Aspect Ratio)</label>
-                <select 
-                  className="select-input"
-                  value={settings.aspectRatio}
-                  onChange={(e) => setSettings({...settings, aspectRatio: e.target.value as any})}
-                >
-                  <option value="16:9">16:9 (YouTube / 横画面)</option>
-                  <option value="9:16">9:16 (TikTok / 縦画面)</option>
-                </select>
+              <div className="control-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div>
+                  <label><Settings size={14} style={{ display: 'inline', marginRight: '2px', verticalAlign: 'text-bottom' }}/> 画面比率</label>
+                  <select 
+                    className="select-input"
+                    value={settings.aspectRatio}
+                    onChange={(e) => setSettings({...settings, aspectRatio: e.target.value as any})}
+                  >
+                    <option value="16:9">16:9 (横画面)</option>
+                    <option value="9:16">9:16 (縦画面)</option>
+                  </select>
+                </div>
+                <div>
+                  <label><Settings size={14} style={{ display: 'inline', marginRight: '2px', verticalAlign: 'text-bottom' }}/> 組版 (縦/横)</label>
+                  <select 
+                    className="select-input"
+                    value={settings.writingMode || 'horizontal'}
+                    onChange={(e) => setSettings({...settings, writingMode: e.target.value as any})}
+                  >
+                    <option value="horizontal">横書き (Horizontal)</option>
+                    <option value="vertical">縦書き (Vertical・長音回転)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="control-group" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div>
+                  <label>縦位置 (Y)</label>
+                  <select 
+                    className="select-input"
+                    value={settings.positionY || 'center'}
+                    onChange={(e) => setSettings({...settings, positionY: e.target.value as any})}
+                  >
+                    <option value="top">上寄せ (Top)</option>
+                    <option value="center">中央 (Center)</option>
+                    <option value="bottom">下寄せ (Bottom)</option>
+                  </select>
+                </div>
+                <div>
+                  <label>横位置 (X)</label>
+                  <select 
+                    className="select-input"
+                    value={settings.positionX || 'center'}
+                    onChange={(e) => setSettings({...settings, positionX: e.target.value as any})}
+                  >
+                    <option value="left">左寄せ (Left)</option>
+                    <option value="center">中央 (Center)</option>
+                    <option value="right">右寄せ (Right)</option>
+                  </select>
+                </div>
               </div>
 
               <div className="control-group">
@@ -590,10 +768,15 @@ function App() {
                   <option value="mix">★ 全自動ミックス (Auto Mix)</option>
                   <option value="telop">番組テロップ風 (Telop)</option>
                   <option value="slide-up">スライドアップ (Slide-Up)</option>
+                  <option value="bounce">ポップ＆バウンス (Bounce)</option>
+                  <option value="glitch">👾 グリッチ/ノイズ (Glitch)</option>
+                  <option value="fade">🌫️ フェードイン/アウト (Fade)</option>
+                  <option value="zoom-in">🔍 ズームバウンス (Zoom In)</option>
+                  <option value="rotate">🔄 スピン回転 (Rotate)</option>
+                  <option value="shake-pop">💥 シェイクバウンス (Shake Pop)</option>
                   <option value="cinematic">シネマティック (Cinematic)</option>
                   <option value="typewriter">タイプライター (Typewriter)</option>
                   <option value="vocaloid">ボカロ風 (Kinetic)</option>
-                  <option value="bounce">ポップ＆バウンス (Bounce)</option>
                 </select>
               </div>
 
@@ -750,8 +933,40 @@ function App() {
             />
           )}
 
+          <div style={{ marginTop: '1rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
+            <details style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
+              <summary>ℹ️ バージョン情報 (v2.1.0)</summary>
+              <div style={{ marginTop: '0.4rem', textAlign: 'left', padding: '0.5rem', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '6px', fontSize: '0.7rem', lineHeight: '1.5' }}>
+                <strong>v2.1.0 主な機能・更新点:</strong><br />
+                • 📱 Android端末正式対応 (WebCodecs & MediaRecorder)<br />
+                • 📝 全画面歌詞エディタ搭載<br />
+                • 🔤 縦書き表示対応 (長音符「ー」90度回転)<br />
+                • 📍 歌詞表示位置設定 (上・中・下 / 左・中・右)<br />
+                • 🖼️ 複数枚画像スライドショー背景対応<br />
+                • 🎨 新フォント5種追加 (手書き・激しいフォント等)<br />
+                • ⚡ 新モーション5種追加 (Glitch, Fade, Zoom-In等)
+              </div>
+            </details>
+          </div>
+
         </div>
       </div>
+
+      <FullscreenLyricEditor 
+        isOpen={isFullscreenEditor}
+        onClose={() => setIsFullscreenEditor(false)}
+        rawLrc={rawLrc}
+        onSave={(newRawLrc, parsedLyrics) => {
+          setRawLrc(newRawLrc);
+          setLyrics(parsedLyrics);
+        }}
+        onSeek={(timeMs) => {
+          if (audioRef.current) {
+            audioRef.current.currentTime = timeMs / 1000;
+            setCurrentTime(timeMs);
+          }
+        }}
+      />
     </div>
   );
 }

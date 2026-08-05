@@ -25,9 +25,53 @@ export class VideoExporter {
         const width = this.canvas.width;
         const height = this.canvas.height;
 
+        // Candidate video codecs: AVC/H.264 profiles for wide Android/Windows/iOS compatibility, followed by VP9 & HEVC
+        const codecsToTry = [
+          'avc1.640028', // High Profile Level 4.0 (1080p)
+          'avc1.4d0028', // Main Profile Level 4.0
+          'avc1.420028', // Baseline Profile Level 4.0
+          'avc1.42E01E', // Baseline Level 3.0
+          'vp09.00.10.08', // VP9 Profile 0
+          'hvc1.1.6.L93.B0' // HEVC Main Profile
+        ];
+
+        let selectedCodec = codecsToTry[0];
+        let codecSupported = false;
+
+        for (const codec of codecsToTry) {
+          try {
+            const config = {
+              codec,
+              width,
+              height,
+              bitrate: 5_000_000,
+              framerate: this.fps
+            };
+            const support = await VideoEncoder.isConfigSupported(config as any);
+            if (support.supported) {
+              selectedCodec = codec;
+              codecSupported = true;
+              break;
+            }
+          } catch (e) {
+            // Ignore unsupported codec check error
+          }
+        }
+
+        if (!codecSupported) {
+          throw new Error("UNSUPPORTED_CODEC");
+        }
+
+        let muxerVideoCodec: 'avc' | 'hevc' | 'vp9' = 'avc';
+        if (selectedCodec.startsWith('hvc') || selectedCodec.startsWith('hev')) {
+          muxerVideoCodec = 'hevc';
+        } else if (selectedCodec.startsWith('vp09') || selectedCodec.startsWith('vp9')) {
+          muxerVideoCodec = 'vp9';
+        }
+
         let muxer = new Muxer.Muxer({
           target: new Muxer.ArrayBufferTarget(),
-          video: { codec: 'hevc', width, height },
+          video: { codec: muxerVideoCodec, width, height },
           audio: { codec: 'aac', sampleRate: 44100, numberOfChannels: 2 },
           fastStart: 'in-memory'
         });
@@ -59,14 +103,22 @@ export class VideoExporter {
           error: e => reject(e)
         });
 
-        videoEncoder.configure({
-          codec: 'hvc1.1.6.L93.B0', // HEVC Main Profile
+        const videoConfig: any = {
+          codec: selectedCodec,
           width,
           height,
           bitrate: 5_000_000,
           framerate: this.fps,
-          hevc: { format: 'hevc' }
-        });
+          hardwareAcceleration: 'prefer-hardware'
+        };
+
+        if (selectedCodec.startsWith('hvc')) {
+          videoConfig.hevc = { format: 'hevc' };
+        } else if (selectedCodec.startsWith('avc')) {
+          videoConfig.avc = { format: 'avc' };
+        }
+
+        videoEncoder.configure(videoConfig);
 
         let audioEncoder = new AudioEncoder({
           output: (chunk, meta: any) => {

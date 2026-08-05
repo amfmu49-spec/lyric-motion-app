@@ -1,5 +1,5 @@
 export interface AppSettings {
-  motionType: 'telop' | 'vocaloid' | 'cinematic' | 'typewriter' | 'slide-up' | 'bounce' | 'mix' | 'auto';
+  motionType: 'telop' | 'vocaloid' | 'cinematic' | 'typewriter' | 'slide-up' | 'bounce' | 'glitch' | 'fade' | 'zoom-in' | 'rotate' | 'shake-pop' | 'mix' | 'auto';
   fontFamily: string;
   fontSize: number;
   autoSize: boolean;
@@ -15,6 +15,9 @@ export interface AppSettings {
   visualizerSensitivity: number;
   effectType: 'none' | 'vhs' | 'rgb-shift' | 'glitch' | 'shake' | 'bloom' | 'flash' | 'cinema' | 'vintage' | 'halftone' | 'negative' | 'rainbow' | 'lightning' | 'fire' | 'laser' | 'fireworks';
   kanjiEmphasis: boolean;
+  writingMode?: 'horizontal' | 'vertical';
+  positionX?: 'left' | 'center' | 'right';
+  positionY?: 'top' | 'center' | 'bottom';
 }
 
 export const FONTS = [
@@ -22,8 +25,13 @@ export const FONTS = [
   { name: 'Zen Kaku Gothic New (角ゴシック)', value: "'Zen Kaku Gothic New', sans-serif" },
   { name: 'Shippori Mincho (しっぽり明朝)', value: "'Shippori Mincho', serif" },
   { name: 'Noto Serif JP (標準明朝)', value: "'Noto Serif JP', serif" },
+  { name: 'Kaisei Tokumin (魁星特民・力強明朝)', value: "'Kaisei Tokumin', serif" },
   { name: 'M PLUS Rounded 1c (丸ゴシック)', value: "'M PLUS Rounded 1c', sans-serif" },
+  { name: 'Yomogi (よもぎ・手書きペン)', value: "'Yomogi', cursive" },
+  { name: 'Yusei Magic (油性マジック手書き)', value: "'Yusei Magic', sans-serif" },
   { name: 'Mochiy Pop One (ポップ)', value: "'Mochiy Pop One', sans-serif" },
+  { name: 'Potta One (極太インパクト)', value: "'Potta One', display" },
+  { name: 'RocknRoll One (ロック・ノリ系)', value: "'RocknRoll One', sans-serif" },
   { name: 'Dela Gothic One (極太ゴシック)', value: "'Dela Gothic One', sans-serif" },
   { name: 'Rampart One (ブロック極太)', value: "'Rampart One', sans-serif" },
   { name: 'Reggae One (トゲトゲ病み系)', value: "'Reggae One', sans-serif" },
