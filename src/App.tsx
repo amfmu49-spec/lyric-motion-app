@@ -638,7 +638,7 @@ function App() {
             <h1 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <span>Lyric Motion Creator</span>
               <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', backgroundColor: 'var(--primary-color, #3498db)', color: '#fff', borderRadius: '12px', fontWeight: 'bold' }}>
-                v2.1.0
+                v2.2.0
               </span>
             </h1>
             <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>Android Ready</span>
@@ -957,16 +957,16 @@ function App() {
 
           <div style={{ marginTop: '1rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
             <details style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
-              <summary>ℹ️ バージョン情報 (v2.1.0)</summary>
+              <summary>ℹ️ バージョン情報 (v2.2.0)</summary>
               <div style={{ marginTop: '0.4rem', textAlign: 'left', padding: '0.5rem', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '6px', fontSize: '0.7rem', lineHeight: '1.5' }}>
-                <strong>v2.1.0 主な機能・更新点:</strong><br />
+                <strong>v2.2.0 主な機能・更新点:</strong><br />
+                • 🎛️ 本物リアルタイムEQイコライザー（Web Audio API帯域連動）<br />
+                • 🎨 ビジュアライザー100%時の完全ソリッド不透明表示対応<br />
                 • 📱 Android端末正式対応 (WebCodecs & MediaRecorder)<br />
                 • 📝 全画面歌詞エディタ搭載<br />
                 • 🔤 縦書き表示対応 (長音符「ー」90度回転)<br />
                 • 📍 歌詞表示位置設定 (上・中・下 / 左・中・右)<br />
-                • 🖼️ 複数枚画像スライドショー背景対応<br />
-                • 🎨 新フォント5種追加 (手書き・激しいフォント等)<br />
-                • ⚡ 新モーション5種追加 (Glitch, Fade, Zoom-In等)
+                • 🖼️ 複数枚画像スライドショー背景対応
               </div>
             </details>
           </div>
