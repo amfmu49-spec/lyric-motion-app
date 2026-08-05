@@ -168,19 +168,112 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
       ctx.restore();
 
       // 1. Draw Background Visualizer
+      const visOpacity = settings.visualizerOpacity ?? 0.8;
+
       if (settings.visualizerType === 'particles') {
          ctx.save();
          ctx.globalCompositeOperation = 'screen';
-         for (let i=0; i<40; i++) {
+         for (let i=0; i<45; i++) {
            const x = ((Math.sin(renderTime * 0.0005 + i * 4.2) + 1) / 2) * width;
            const y = height - ((renderTime * (0.05 + (i%5)*0.01) + i * 123) % height);
-           const r = 2 + Math.abs(Math.cos(i)) * 4 + (energy * 8);
+           const r = (3 + Math.abs(Math.cos(i)) * 6 + (energy * 10)) * (width / 1000);
            ctx.beginPath();
            ctx.arc(x, y, r, 0, Math.PI*2);
-           ctx.fillStyle = `rgba(${visRgb}, ${0.1 + energy * 0.6})`;
+           ctx.fillStyle = `rgba(${visRgb}, ${Math.min(1, (0.3 + energy * 0.7) * visOpacity)})`;
+           ctx.shadowColor = visHex;
+           ctx.shadowBlur = 18;
+           ctx.fill();
+         }
+         ctx.restore();
+      } else if (settings.visualizerType === 'shapes') {
+         // ★ Random Geometric Shapes (Circle, Square, Triangle, Star, Diamond, Ring)
+         ctx.save();
+         ctx.globalCompositeOperation = 'screen';
+         const shapeTypes = [0, 1, 2, 3, 4, 5];
+         for (let i = 0; i < 35; i++) {
+           const pseudoSeed = i * 777;
+           const x = ((Math.sin(renderTime * 0.0004 + i * 3.7) + 1) / 2) * width;
+           const y = height - ((renderTime * (0.04 + (i % 6) * 0.012) + pseudoSeed) % (height + 100));
+           const baseSize = (12 + (i % 5) * 8 + energy * 20) * (width / 1000);
+           const angle = (renderTime * 0.001 * ((i % 2 === 0) ? 1 : -1) + pseudoSeed) % (Math.PI * 2);
+           const shapeType = shapeTypes[i % shapeTypes.length];
+           const alpha = Math.min(1, (0.35 + energy * 0.65) * visOpacity);
+
+           ctx.fillStyle = `rgba(${visRgb}, ${alpha})`;
+           ctx.strokeStyle = `rgba(${visRgb}, ${alpha * 0.9})`;
+           ctx.lineWidth = 3 * (width / 1000);
            ctx.shadowColor = visHex;
            ctx.shadowBlur = 15;
-           ctx.fill();
+
+           // Inline shape rendering
+           ctx.save();
+           ctx.translate(x, y);
+           ctx.rotate(angle);
+           ctx.beginPath();
+           if (shapeType === 0) { // Circle
+             ctx.arc(0, 0, baseSize, 0, Math.PI * 2);
+             ctx.fill();
+           } else if (shapeType === 1) { // Square
+             ctx.rect(-baseSize, -baseSize, baseSize * 2, baseSize * 2);
+             ctx.fill();
+           } else if (shapeType === 2) { // Triangle
+             ctx.moveTo(0, -baseSize * 1.3);
+             ctx.lineTo(baseSize, baseSize);
+             ctx.lineTo(-baseSize, baseSize);
+             ctx.closePath();
+             ctx.fill();
+           } else if (shapeType === 3) { // Star
+             for (let s = 0; s < 5; s++) {
+               const outerA = (s * Math.PI * 2) / 5 - Math.PI / 2;
+               const innerA = outerA + Math.PI / 5;
+               const ox = Math.cos(outerA) * baseSize * 1.3;
+               const oy = Math.sin(outerA) * baseSize * 1.3;
+               const ix = Math.cos(innerA) * baseSize * 0.6;
+               const iy = Math.sin(innerA) * baseSize * 0.6;
+               if (s === 0) ctx.moveTo(ox, oy);
+               else ctx.lineTo(ox, oy);
+               ctx.lineTo(ix, iy);
+             }
+             ctx.closePath();
+             ctx.fill();
+           } else if (shapeType === 4) { // Diamond
+             ctx.moveTo(0, -baseSize * 1.3);
+             ctx.lineTo(baseSize * 0.9, 0);
+             ctx.lineTo(0, baseSize * 1.3);
+             ctx.lineTo(-baseSize * 0.9, 0);
+             ctx.closePath();
+             ctx.fill();
+           } else { // Ring
+             ctx.arc(0, 0, baseSize, 0, Math.PI * 2);
+             ctx.lineWidth = baseSize * 0.4;
+             ctx.stroke();
+           }
+           ctx.stroke();
+           ctx.restore();
+         }
+         ctx.restore();
+      } else if (settings.visualizerType === 'neon-burst') {
+         // ⚡ Sharp Crisp Neon Burst
+         ctx.save();
+         ctx.translate(width / 2, height / 2);
+         ctx.globalCompositeOperation = 'screen';
+         const rays = 16;
+         const baseR = (150 + Math.pow(energy, 1.8) * 200) * (width / 1000);
+         ctx.shadowColor = visHex;
+         ctx.shadowBlur = 25;
+
+         for (let i = 0; i < rays; i++) {
+           const angle = (i * Math.PI * 2) / rays + (renderTime * 0.0008);
+           const rayLength = baseR + Math.sin(renderTime * 0.01 + i * 1.5) * 60 * energy;
+           const x = Math.cos(angle) * rayLength;
+           const y = Math.sin(angle) * rayLength;
+
+           ctx.beginPath();
+           ctx.moveTo(0, 0);
+           ctx.lineTo(x, y);
+           ctx.strokeStyle = `rgba(${visRgb}, ${Math.min(1, (0.6 + energy * 0.4) * visOpacity)})`;
+           ctx.lineWidth = (4 + energy * 6) * (width / 1000);
+           ctx.stroke();
          }
          ctx.restore();
       } else if (settings.visualizerType === 'waveform') {
@@ -189,33 +282,33 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
          ctx.beginPath();
          ctx.moveTo(0, height);
          for(let i=0; i<=width; i+=15) {
-            // Standing wave: no horizontal scrolling, just up and down
             const spatial = Math.sin(i * 0.015) + Math.cos(i * 0.025);
             const temporal = Math.sin(renderTime * 0.004) * 0.5 + Math.cos(renderTime * 0.006) * 0.5;
             const wave = Math.abs(spatial * temporal);
-            const h = energy * 250 * (0.1 + wave);
+            const h = energy * 280 * (0.1 + wave);
             ctx.lineTo(i, height - h);
          }
          ctx.lineTo(width, height);
-         ctx.fillStyle = `rgba(${visRgb}, 0.1)`;
+         ctx.fillStyle = `rgba(${visRgb}, ${Math.min(1, (0.2 + energy * 0.5) * visOpacity)})`;
          ctx.fill();
-         ctx.strokeStyle = `rgba(${visRgb}, 0.4)`;
-         ctx.lineWidth = 2;
+         ctx.strokeStyle = `rgba(${visRgb}, ${Math.min(1, (0.7 + energy * 0.3) * visOpacity)})`;
+         ctx.lineWidth = 3;
+         ctx.shadowColor = visHex;
+         ctx.shadowBlur = 12;
          ctx.stroke();
          ctx.restore();
       } else if (settings.visualizerType === 'bars') {
          ctx.save();
          ctx.globalCompositeOperation = 'screen';
-         const barWidth = 16;
+         const barWidth = 18;
          const gap = 8;
          for(let i=0; i<=width; i+=barWidth+gap) {
-            // Pseudo random phase per bar, no scrolling
             const pseudoRnd = Math.sin(i * 12.9898);
             const wave = Math.sin(renderTime * 0.005 + pseudoRnd * Math.PI * 2) * 0.5 + 0.5;
-            const h = energy * 300 * (0.05 + wave * 0.95);
-            ctx.fillStyle = `rgba(${visRgb}, ${0.1 + wave * 0.5})`;
+            const h = energy * 320 * (0.05 + wave * 0.95);
+            ctx.fillStyle = `rgba(${visRgb}, ${Math.min(1, (0.4 + wave * 0.6) * visOpacity)})`;
             ctx.shadowColor = visHex;
-            ctx.shadowBlur = 10;
+            ctx.shadowBlur = 12;
             ctx.fillRect(i, height - h, barWidth, h);
          }
          ctx.restore();
@@ -226,7 +319,6 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
          const radius = 200 + Math.pow(energy, 2) * 150;
          ctx.beginPath();
          for(let i=0; i<=Math.PI*2; i+=0.05) {
-            // Standing wave on circle
             const spatial = Math.sin(i * 12);
             const temporal = Math.sin(renderTime * 0.005);
             const wave = spatial * temporal;
@@ -237,22 +329,22 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
             else ctx.lineTo(x, y);
          }
          ctx.closePath();
-         ctx.strokeStyle = `rgba(${visRgb}, 0.6)`;
-         ctx.lineWidth = 4 + energy * 4;
+         ctx.strokeStyle = `rgba(${visRgb}, ${Math.min(1, (0.8 + energy * 0.2) * visOpacity)})`;
+         ctx.lineWidth = 5 + energy * 5;
          ctx.shadowColor = visHex;
-         ctx.shadowBlur = 20;
+         ctx.shadowBlur = 22;
          ctx.stroke();
          
-         ctx.fillStyle = `rgba(${visRgb}, ${0.02 + energy * 0.08})`;
+         ctx.fillStyle = `rgba(${visRgb}, ${Math.min(1, (0.08 + energy * 0.15) * visOpacity)})`;
          ctx.fill();
          ctx.restore();
       } else if (settings.visualizerType === 'grid') {
          ctx.save();
          ctx.globalCompositeOperation = 'screen';
-         ctx.strokeStyle = `rgba(${visRgb}, ${0.1 + energy * 0.4})`;
-         ctx.lineWidth = 1 + energy * 3;
+         ctx.strokeStyle = `rgba(${visRgb}, ${Math.min(1, (0.3 + energy * 0.6) * visOpacity)})`;
+         ctx.lineWidth = 2 + energy * 3;
          ctx.shadowColor = visHex;
-         ctx.shadowBlur = energy * 10;
+         ctx.shadowBlur = 12;
          const gridSize = 80;
          const offsetX = (renderTime * 0.05) % gridSize;
          const offsetY = (renderTime * 0.05) % gridSize;

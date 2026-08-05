@@ -10,9 +10,10 @@ export interface AppSettings {
   songTitle: string;
   artistName: string;
   overlayStyle: 'none' | 'intro' | 'corner';
-  visualizerType: 'none' | 'particles' | 'waveform' | 'bars' | 'circle' | 'grid';
+  visualizerType: 'none' | 'particles' | 'waveform' | 'bars' | 'circle' | 'grid' | 'shapes' | 'neon-burst';
   visualizerColor: string;
   visualizerSensitivity: number;
+  visualizerOpacity?: number;
   effectType: 'none' | 'vhs' | 'rgb-shift' | 'glitch' | 'shake' | 'bloom' | 'flash' | 'cinema' | 'vintage' | 'halftone' | 'negative' | 'rainbow' | 'lightning' | 'fire' | 'laser' | 'fireworks';
   kanjiEmphasis: boolean;
   writingMode?: 'horizontal' | 'vertical';

@@ -53,6 +53,7 @@ function App() {
     visualizerType: 'none',
     visualizerColor: '#ffffff',
     visualizerSensitivity: 1.0,
+    visualizerOpacity: 0.8,
     effectType: 'none',
     kanjiEmphasis: true,
     writingMode: 'horizontal',
@@ -887,6 +888,8 @@ function App() {
                   onChange={e => setSettings({...settings, visualizerType: e.target.value as any})}
                 >
                   <option value="none">なし (None)</option>
+                  <option value="shapes">★ ランダム幾何学図形 (Random Shapes)</option>
+                  <option value="neon-burst">⚡ ネオンバースト (Neon Burst)</option>
                   <option value="particles">パーティクル (Particles)</option>
                   <option value="waveform">波形 (Waveform)</option>
                   <option value="bars">バー (Bars)</option>
@@ -896,29 +899,42 @@ function App() {
               </div>
 
               {settings.visualizerType !== 'none' && (
-                <div className="control-group" style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>色 (Color)</label>
-                    <input 
-                      type="color" 
-                      className="color-input" 
-                      style={{ height: '32px', padding: '0 4px' }}
-                      value={settings.visualizerColor}
-                      onChange={e => setSettings({...settings, visualizerColor: e.target.value})}
-                    />
+                <>
+                  <div className="control-group" style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>発色 (Color)</label>
+                      <input 
+                        type="color" 
+                        className="color-input" 
+                        style={{ height: '32px', padding: '0 4px' }}
+                        value={settings.visualizerColor}
+                        onChange={e => setSettings({...settings, visualizerColor: e.target.value})}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>透明度: {Math.round((settings.visualizerOpacity ?? 0.8) * 100)}%</label>
+                      <input 
+                        type="range" 
+                        className="range-input" 
+                        min="0.1" max="1.0" step="0.05"
+                        title={`透明度: ${settings.visualizerOpacity}`}
+                        value={settings.visualizerOpacity ?? 0.8}
+                        onChange={e => setSettings({...settings, visualizerOpacity: parseFloat(e.target.value)})}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <label style={{ fontSize: '0.75rem', color: 'var(--text-secondary)' }}>感度 (Sensitivity)</label>
+                      <input 
+                        type="range" 
+                        className="range-input" 
+                        min="0.1" max="3" step="0.1"
+                        title={`感度: ${settings.visualizerSensitivity}`}
+                        value={settings.visualizerSensitivity}
+                        onChange={e => setSettings({...settings, visualizerSensitivity: parseFloat(e.target.value)})}
+                      />
+                    </div>
                   </div>
-                  <div style={{ flex: 1 }}>
-                    <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>感度 (Sensitivity)</label>
-                    <input 
-                      type="range" 
-                      className="range-input" 
-                      min="0.1" max="3" step="0.1"
-                      title={`感度: ${settings.visualizerSensitivity}`}
-                      value={settings.visualizerSensitivity}
-                      onChange={e => setSettings({...settings, visualizerSensitivity: parseFloat(e.target.value)})}
-                    />
-                  </div>
-                </div>
+                </>
               )}
             </>
           ) : (
