@@ -8,6 +8,7 @@ interface Props {
   settings: AppSettings;
   customConfigs?: CustomConfigMap;
   getAudioEnergy?: () => number;
+  getAudioFrequencyData?: () => Uint8Array;
   bgMediaUrl: string | null;
   bgMediaType: 'image' | 'video' | 'slideshow';
   bgImages?: string[];
@@ -37,7 +38,7 @@ export interface CanvasRendererRef extends HTMLCanvasElement {
 }
 
 export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
-  lyrics, currentTime, settings, customConfigs = {}, getAudioEnergy, bgMediaUrl, bgMediaType, bgImages = []
+  lyrics, currentTime, settings, customConfigs = {}, getAudioEnergy, getAudioFrequencyData, bgMediaUrl, bgMediaType, bgImages = []
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   
@@ -172,16 +173,25 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
       const isSolid = visOpacity >= 0.95;
       const blendMode = isSolid ? 'source-over' : 'screen';
 
+      const freqData = getAudioFrequencyData ? getAudioFrequencyData() : new Uint8Array(0);
+      const hasFreq = freqData && freqData.length > 0;
+      const sensitivity = settings.visualizerSensitivity || 1.0;
+
       if (settings.visualizerType === 'particles') {
          ctx.save();
          ctx.globalCompositeOperation = blendMode;
          for (let i=0; i<45; i++) {
            const x = ((Math.sin(renderTime * 0.0005 + i * 4.2) + 1) / 2) * width;
            const y = height - ((renderTime * (0.05 + (i%5)*0.01) + i * 123) % height);
-           const r = (3 + Math.abs(Math.cos(i)) * 6 + (energy * 10)) * (width / 1000);
+           let pEnergy = energy;
+           if (hasFreq) {
+             const binIdx = Math.floor((i / 45) * (freqData.length * 0.8));
+             pEnergy = (freqData[binIdx] / 255) * sensitivity;
+           }
+           const r = (3 + Math.abs(Math.cos(i)) * 4 + (pEnergy * 14)) * (width / 1000);
            ctx.beginPath();
            ctx.arc(x, y, r, 0, Math.PI*2);
-           const alpha = isSolid ? 1.0 : Math.min(1, (0.3 + energy * 0.7) * visOpacity);
+           const alpha = isSolid ? 1.0 : Math.min(1, (0.2 + pEnergy * 0.8) * visOpacity);
            ctx.fillStyle = `rgba(${visRgb}, ${alpha})`;
            ctx.shadowColor = isSolid ? 'transparent' : visHex;
            ctx.shadowBlur = isSolid ? 0 : 18;
@@ -193,12 +203,21 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
          ctx.globalCompositeOperation = blendMode;
          ctx.beginPath();
          ctx.moveTo(0, height);
-         for(let i=0; i<=width; i+=15) {
-            const spatial = Math.sin(i * 0.015) + Math.cos(i * 0.025);
-            const temporal = Math.sin(renderTime * 0.004) * 0.5 + Math.cos(renderTime * 0.006) * 0.5;
-            const wave = Math.abs(spatial * temporal);
-            const h = energy * 280 * (0.1 + wave);
-            ctx.lineTo(i, height - h);
+         const points = 64;
+         const stepX = width / (points - 1);
+         for(let i=0; i<points; i++) {
+            const x = i * stepX;
+            let amp = 0;
+            if (hasFreq) {
+              const binIdx = Math.floor(Math.pow(i / (points - 1), 1.2) * (freqData.length * 0.75));
+              amp = (freqData[binIdx] / 255) * sensitivity;
+            } else {
+              const spatial = Math.sin(i * 0.2);
+              const temporal = Math.sin(renderTime * 0.004);
+              amp = Math.abs(spatial * temporal) * energy;
+            }
+            const h = amp * height * 0.35;
+            ctx.lineTo(x, height - h);
          }
          ctx.lineTo(width, height);
          const fillAlpha = isSolid ? 1.0 : Math.min(1, (0.25 + energy * 0.5) * visOpacity);
@@ -212,34 +231,57 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
          ctx.stroke();
          ctx.restore();
       } else if (settings.visualizerType === 'bars') {
+         // 真のイコライザー (EQ) バー
          ctx.save();
          ctx.globalCompositeOperation = blendMode;
-         const barWidth = 18;
-         const gap = 8;
-         for(let i=0; i<=width; i+=barWidth+gap) {
-            const pseudoRnd = Math.sin(i * 12.9898);
-            const wave = Math.sin(renderTime * 0.005 + pseudoRnd * Math.PI * 2) * 0.5 + 0.5;
-            const h = energy * 320 * (0.05 + wave * 0.95);
-            const alpha = isSolid ? 1.0 : Math.min(1, (0.4 + wave * 0.6) * visOpacity);
+         const barCount = 48;
+         const gap = 6 * (width / 1920);
+         const paddingX = 40 * (width / 1920);
+         const availableWidth = width - (paddingX * 2) - (gap * (barCount - 1));
+         const barWidth = availableWidth / barCount;
+
+         for(let i=0; i<barCount; i++) {
+            let amp = 0;
+            if (hasFreq) {
+              // 周波数帯域バケット (低音〜高音)
+              const binIdx = Math.floor(Math.pow(i / barCount, 1.4) * (freqData.length * 0.75));
+              amp = (freqData[binIdx] / 255) * sensitivity;
+            } else {
+              const pseudoRnd = Math.sin(i * 12.9898);
+              const wave = Math.sin(renderTime * 0.005 + pseudoRnd * Math.PI * 2) * 0.5 + 0.5;
+              amp = energy * wave;
+            }
+            const maxBarH = height * 0.45;
+            const h = amp * maxBarH;
+            const x = paddingX + i * (barWidth + gap);
+            const y = height - h;
+            const alpha = isSolid ? 1.0 : Math.min(1, (0.35 + amp * 0.65) * visOpacity);
+            
             ctx.fillStyle = `rgba(${visRgb}, ${alpha})`;
             ctx.shadowColor = isSolid ? 'transparent' : visHex;
             ctx.shadowBlur = isSolid ? 0 : 12;
-            ctx.fillRect(i, height - h, barWidth, h);
+            ctx.fillRect(x, y, barWidth, h);
          }
          ctx.restore();
       } else if (settings.visualizerType === 'circle') {
          ctx.save();
          ctx.translate(width/2, height/2);
          ctx.globalCompositeOperation = blendMode;
-         const radius = 200 + Math.pow(energy, 2) * 150;
+         const baseRadius = 200 * (width / 1000);
+         const numPoints = 64;
          ctx.beginPath();
-         for(let i=0; i<=Math.PI*2; i+=0.05) {
-            const spatial = Math.sin(i * 12);
-            const temporal = Math.sin(renderTime * 0.005);
-            const wave = spatial * temporal;
-            const r = radius + wave * 40 * energy;
-            const x = Math.cos(i) * r;
-            const y = Math.sin(i) * r;
+         for(let i=0; i<=numPoints; i++) {
+            const angle = (i / numPoints) * Math.PI * 2;
+            let amp = 0;
+            if (hasFreq) {
+              const binIdx = Math.floor((i % (numPoints / 2)) / (numPoints / 2) * (freqData.length * 0.75));
+              amp = (freqData[binIdx] / 255) * sensitivity;
+            } else {
+              amp = energy;
+            }
+            const r = baseRadius + (amp * 160 * (width / 1000));
+            const x = Math.cos(angle) * r;
+            const y = Math.sin(angle) * r;
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
          }

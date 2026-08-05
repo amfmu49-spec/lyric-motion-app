@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, Pause, FileAudio, FileText, ImageIcon, Edit3, Loader2, Settings, Maximize, Minimize, Expand, Images } from 'lucide-react';
 import { CanvasRenderer } from './components/CanvasRenderer';
 import type { CanvasRendererRef } from './components/CanvasRenderer';
@@ -143,15 +143,31 @@ function App() {
     }
   };
 
+  const getAudioFrequencyData = useCallback(() => {
+    if (!analyserRef.current) return new Uint8Array(0);
+    const bufferLength = analyserRef.current.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    analyserRef.current.getByteFrequencyData(dataArray);
+    return dataArray;
+  }, []);
+
+  const getAudioEnergy = useCallback(() => {
+    if (!analyserRef.current) return 0;
+    const bufferLength = analyserRef.current.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    analyserRef.current.getByteFrequencyData(dataArray);
+    let sum = 0;
+    for (let i = 0; i < bufferLength; i++) {
+      sum += dataArray[i];
+    }
+    return (sum / bufferLength) / 255;
+  }, []);
+
   useEffect(() => {
     const renderLoop = () => {
       if (isPlaying && audioRef.current) {
         setCurrentTime(audioRef.current.currentTime * 1000);
       }
-
-      // Render Loop inside App.tsx only updates preview time
-
-
       reqRef.current = requestAnimationFrame(renderLoop);
     };
 
@@ -418,16 +434,7 @@ function App() {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
-  const getAudioEnergy = () => {
-    if (!analyserRef.current) return 0;
-    const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount);
-    analyserRef.current.getByteFrequencyData(dataArray);
-    let bassSum = 0;
-    for(let i=0; i<10; i++) {
-      bassSum += dataArray[i];
-    }
-    return (bassSum / 10) / 255;
-  };
+
 
   return (
     <div className="app-container">
@@ -482,6 +489,7 @@ function App() {
                   settings={settings}
                   customConfigs={appMode === 'CUSTOM' ? customConfigs : undefined}
                   getAudioEnergy={getAudioEnergy}
+                  getAudioFrequencyData={getAudioFrequencyData}
                   bgMediaUrl={bgMediaUrl}
                   bgMediaType={bgMediaType}
                   bgImages={bgImages}
