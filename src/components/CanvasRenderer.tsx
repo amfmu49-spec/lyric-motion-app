@@ -181,8 +181,9 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
         const index = Math.floor(currentProgressMs / intervalMs) % imgs.length;
         const nextIndex = (index + 1) % imgs.length;
         const timeInCurrentSlide = currentProgressMs % intervalMs;
+        const isKenBurns = settings.kenBurnsEffect ?? true;
 
-        const drawSingleImage = (img: HTMLImageElement, alpha: number) => {
+        const drawSingleImage = (img: HTMLImageElement, alpha: number, imgIdx: number, slideTimeMs: number) => {
           if (!img) return;
           const nw = img.naturalWidth || img.width;
           const nh = img.naturalHeight || img.height;
@@ -191,9 +192,26 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
           const iRatio = nw / nh;
           const cRatio = width / height;
 
-          let coverW = width * 1.2, coverH = height * 1.2;
-          if (iRatio > cRatio) coverW = (height * 1.2) * iRatio;
-          else coverH = (width * 1.2) / iRatio;
+          let kbScale = 1.0;
+          let kbPanX = 0;
+          let kbPanY = 0;
+
+          if (isKenBurns) {
+            const progress = Math.min(1, Math.max(0, slideTimeMs / intervalMs));
+            const isZoomIn = imgIdx % 2 === 0;
+            kbScale = isZoomIn ? 1.0 + (progress * 0.15) : 1.15 - (progress * 0.15);
+            const panDirection = (imgIdx % 3 === 0) ? 1 : (imgIdx % 3 === 1) ? -1 : 0.5;
+            kbPanX = Math.sin(progress * Math.PI * 0.8) * 30 * panDirection * (width / 1920);
+            kbPanY = Math.cos(progress * Math.PI * 0.8) * 20 * panDirection * (height / 1080);
+          }
+
+          ctx.save();
+          ctx.translate(kbPanX, kbPanY);
+          ctx.scale(kbScale, kbScale);
+
+          let coverW = width * 1.25, coverH = height * 1.25;
+          if (iRatio > cRatio) coverW = (height * 1.25) * iRatio;
+          else coverH = (width * 1.25) / iRatio;
 
           ctx.save();
           ctx.globalAlpha = alpha * 0.3;
@@ -208,14 +226,17 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
           ctx.globalAlpha = alpha;
           ctx.drawImage(img, -containW/2, -containH/2, containW, containH);
           ctx.restore();
+
+          ctx.restore();
         };
 
         if (timeInCurrentSlide >= (intervalMs - fadeMs) && imgs[nextIndex]) {
           const fadeProgress = (timeInCurrentSlide - (intervalMs - fadeMs)) / fadeMs;
-          drawSingleImage(imgs[index], 1.0 - fadeProgress);
-          drawSingleImage(imgs[nextIndex], fadeProgress);
+          drawSingleImage(imgs[index], 1.0 - fadeProgress, index, timeInCurrentSlide);
+          const nextSlideTime = (timeInCurrentSlide - (intervalMs - fadeMs));
+          drawSingleImage(imgs[nextIndex], fadeProgress, nextIndex, nextSlideTime);
         } else if (imgs[index]) {
-          drawSingleImage(imgs[index], 1.0);
+          drawSingleImage(imgs[index], 1.0, index, timeInCurrentSlide);
         }
       }
       ctx.restore();

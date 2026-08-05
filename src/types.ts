@@ -19,6 +19,7 @@ export interface AppSettings {
   writingMode?: 'horizontal' | 'vertical';
   positionX?: 'left' | 'center' | 'right';
   positionY?: 'top' | 'center' | 'bottom';
+  kenBurnsEffect?: boolean;
 }
 
 export const FONTS = [

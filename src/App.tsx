@@ -638,7 +638,7 @@ function App() {
             <h1 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <span>Lyric Motion Creator</span>
               <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', backgroundColor: 'var(--primary-color, #3498db)', color: '#fff', borderRadius: '12px', fontWeight: 'bold' }}>
-                v2.2.1
+                v2.3.0
               </span>
             </h1>
             <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>Android Ready</span>
@@ -680,6 +680,17 @@ function App() {
                 <input type="file" onChange={handleLrcUpload} />
               </div>
             </div>
+
+            {bgMediaType === 'slideshow' && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginTop: '0.4rem', fontSize: '0.8rem', color: '#e0e0e0', cursor: 'pointer' }}>
+                <input 
+                  type="checkbox" 
+                  checked={settings.kenBurnsEffect ?? true} 
+                  onChange={e => setSettings({ ...settings, kenBurnsEffect: e.target.checked })} 
+                />
+                🎬 ケンバーンズ効果 (ゆっくりズーム＆移動)
+              </label>
+            )}
 
             <button
               className="btn"
@@ -957,10 +968,11 @@ function App() {
 
           <div style={{ marginTop: '1rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
             <details style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
-              <summary>ℹ️ バージョン情報 (v2.2.1)</summary>
+              <summary>ℹ️ バージョン情報 (v2.3.0)</summary>
               <div style={{ marginTop: '0.4rem', textAlign: 'left', padding: '0.5rem', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '6px', fontSize: '0.7rem', lineHeight: '1.5' }}>
-                <strong>v2.2.1 主な機能・更新点:</strong><br />
-                • 🖼️ 複数枚画像スライドショー背景のレンダリング完全修正（4秒間隔クロスフェード）<br />
+                <strong>v2.3.0 主な機能・更新点:</strong><br />
+                • 🎬 ケンバーンズ効果（スライドショー時のゆっくりズーム＆パン移動アニメーション）機能追加<br />
+                • 🖼️ 複数枚画像スライドショー背景レンダリング完全修正<br />
                 • 🎛️ 本物リアルタイムEQイコライザー（Web Audio API帯域連動）<br />
                 • 🎨 ビジュアライザー100%時の完全ソリッド不透明表示対応<br />
                 • 📱 Android端末正式対応 (WebCodecs & MediaRecorder)<br />
