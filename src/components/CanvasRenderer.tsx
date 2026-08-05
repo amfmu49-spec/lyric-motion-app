@@ -174,16 +174,18 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
         }
       } else if (bgMediaType === 'slideshow' && bgSlideshowImgsRef.current.length > 0) {
         const imgs = bgSlideshowImgsRef.current;
-        const intervalMs = 4000;
-        const fadeMs = 800;
-        const totalDuration = imgs.length * intervalMs;
-        const currentProgressMs = renderTime % totalDuration;
-        const index = Math.floor(currentProgressMs / intervalMs) % imgs.length;
-        const nextIndex = (index + 1) % imgs.length;
-        const timeInCurrentSlide = currentProgressMs % intervalMs;
+        const displayDuration = 3200; // 時間（3.2秒間メイン表示）
+        const fadeDuration = 800;    // フェード（0.8秒間クロスフェード）
+        const slideCycleMs = displayDuration + fadeDuration; // 全体4秒周期
+        const totalDuration = imgs.length * slideCycleMs;
+
+        const cycleTime = renderTime % totalDuration;
+        const currentIndex = Math.floor(cycleTime / slideCycleMs) % imgs.length;
+        const nextIndex = (currentIndex + 1) % imgs.length;
+        const timeInSlide = cycleTime % slideCycleMs;
         const isKenBurns = settings.kenBurnsEffect ?? true;
 
-        const drawSingleImage = (img: HTMLImageElement, alpha: number, imgIdx: number, slideTimeMs: number) => {
+        const drawSingleImage = (img: HTMLImageElement, alpha: number, imgIdx: number, ageMs: number) => {
           if (!img) return;
           const nw = img.naturalWidth || img.width;
           const nh = img.naturalHeight || img.height;
@@ -197,41 +199,34 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
           let kbPanY = 0;
 
           if (isKenBurns) {
-            // Smooth progress with smooth easing
-            const rawProgress = Math.min(1.0, Math.max(0.0, slideTimeMs / intervalMs));
-            // Cubic ease-in-out for silky smooth motion with no mid-stop
+            // 画像の誕生から消滅までの完全連続進行 (0.0 -> 1.0)
+            const rawProgress = Math.min(1.0, Math.max(0.0, ageMs / (slideCycleMs + fadeDuration)));
             const progress = rawProgress < 0.5 
               ? 2 * rawProgress * rawProgress 
               : 1 - Math.pow(-2 * rawProgress + 2, 2) / 2;
 
-            // 5 Diverse Motion & Origin Patterns
             const pattern = Math.abs(imgIdx * 17) % 5;
-            const maxZoom = 0.20; // 20% zoom range
+            const maxZoom = 0.16;
 
             if (pattern === 0) {
-              // Pattern 0: Zoom in towards Top-Left
               kbScale = 1.0 + (progress * maxZoom);
-              kbPanX = -progress * width * 0.06;
-              kbPanY = -progress * height * 0.06;
+              kbPanX = -progress * width * 0.05;
+              kbPanY = -progress * height * 0.05;
             } else if (pattern === 1) {
-              // Pattern 1: Zoom out from Bottom-Right
               kbScale = (1.0 + maxZoom) - (progress * maxZoom);
-              kbPanX = (1 - progress) * width * 0.06;
-              kbPanY = (1 - progress) * height * 0.06;
+              kbPanX = (1 - progress) * width * 0.05;
+              kbPanY = (1 - progress) * height * 0.05;
             } else if (pattern === 2) {
-              // Pattern 2: Zoom in towards Top-Right
               kbScale = 1.0 + (progress * maxZoom);
-              kbPanX = progress * width * 0.06;
-              kbPanY = -progress * height * 0.06;
+              kbPanX = progress * width * 0.05;
+              kbPanY = -progress * height * 0.05;
             } else if (pattern === 3) {
-              // Pattern 3: Zoom out from Bottom-Left
               kbScale = (1.0 + maxZoom) - (progress * maxZoom);
-              kbPanX = -(1 - progress) * width * 0.06;
-              kbPanY = (1 - progress) * height * 0.06;
+              kbPanX = -(1 - progress) * width * 0.05;
+              kbPanY = (1 - progress) * height * 0.05;
             } else {
-              // Pattern 4: Smooth Horizontal Pan + Gentle Center Pulsing
-              kbScale = 1.08 + Math.sin(progress * Math.PI) * 0.06;
-              kbPanX = (-0.06 + progress * 0.12) * width;
+              kbScale = 1.06 + Math.sin(progress * Math.PI) * 0.05;
+              kbPanX = (-0.04 + progress * 0.08) * width;
               kbPanY = Math.cos(progress * Math.PI) * 0.02 * height;
             }
           }
@@ -261,13 +256,20 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
           ctx.restore();
         };
 
-        if (timeInCurrentSlide >= (intervalMs - fadeMs) && imgs[nextIndex]) {
-          const fadeProgress = (timeInCurrentSlide - (intervalMs - fadeMs)) / fadeMs;
-          drawSingleImage(imgs[index], 1.0 - fadeProgress, index, timeInCurrentSlide);
-          const nextSlideTime = (timeInCurrentSlide - (intervalMs - fadeMs));
-          drawSingleImage(imgs[nextIndex], fadeProgress, nextIndex, nextSlideTime);
-        } else if (imgs[index]) {
-          drawSingleImage(imgs[index], 1.0, index, timeInCurrentSlide);
+        if (timeInSlide < displayDuration) {
+          // メイン表示期間 (画像Aは age = fadeDuration + timeInSlide)
+          const ageA = fadeDuration + timeInSlide;
+          drawSingleImage(imgs[currentIndex], 1.0, currentIndex, ageA);
+        } else {
+          // クロスフェード期間 (画像A退場、画像B入場)
+          const fadeProgress = (timeInSlide - displayDuration) / fadeDuration; // 0.0 -> 1.0
+          const ageA = fadeDuration + timeInSlide;
+          const ageB = timeInSlide - displayDuration; // 画像Bの年齢: 0ms -> 800ms
+
+          drawSingleImage(imgs[currentIndex], 1.0 - fadeProgress, currentIndex, ageA);
+          if (imgs[nextIndex]) {
+            drawSingleImage(imgs[nextIndex], fadeProgress, nextIndex, ageB);
+          }
         }
       }
       ctx.restore();
