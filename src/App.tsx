@@ -163,6 +163,23 @@ function App() {
     return (sum / bufferLength) / 255;
   }, []);
 
+  // Version Check & Auto Cache Purge Logic for v2.4.0
+  useEffect(() => {
+    const CURRENT_VERSION = 'v2.4.0';
+    const lastVer = localStorage.getItem('lyric_motion_app_ver');
+    if (lastVer !== CURRENT_VERSION) {
+      localStorage.setItem('lyric_motion_app_ver', CURRENT_VERSION);
+      if ('caches' in window) {
+        caches.keys().then((names) => {
+          names.forEach((name) => caches.delete(name));
+        });
+      }
+      if (lastVer) {
+        window.location.reload();
+      }
+    }
+  }, []);
+
   useEffect(() => {
     const renderLoop = () => {
       if (isPlaying && audioRef.current) {
