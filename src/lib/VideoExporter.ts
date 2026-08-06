@@ -153,6 +153,9 @@ export class VideoExporter {
 
         // Decode audio
         const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 44100 });
+        if (audioCtx.state === 'suspended') {
+          await audioCtx.resume().catch(e => console.warn("Failed to resume offline AudioContext:", e));
+        }
         const decodedAudio = await audioCtx.decodeAudioData(this.audioBuffer.slice(0));
         
         const channelData = [
