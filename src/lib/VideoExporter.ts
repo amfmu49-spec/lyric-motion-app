@@ -73,7 +73,8 @@ export class VideoExporter {
           target: new Muxer.ArrayBufferTarget(),
           video: { codec: muxerVideoCodec, width, height },
           audio: { codec: 'aac', sampleRate: 44100, numberOfChannels: 2 },
-          fastStart: 'in-memory'
+          fastStart: 'in-memory',
+          firstTimestampBehavior: 'offset'
         });
 
         let encodedFrames = 0;
@@ -201,11 +202,13 @@ export class VideoExporter {
               await new Promise(r => setTimeout(r, 10));
             }
 
-            const currentTimeMs = (currentFrame / this.fps) * 1000;
+            const frameDurationUs = Math.round(1_000_000 / this.fps);
+            const timestampUs = Math.round(currentFrame * frameDurationUs);
+            const currentTimeMs = (timestampUs / 1000);
             this.renderFrame(currentTimeMs);
 
             const videoFrame = new VideoFrame(this.canvas, {
-              timestamp: (currentFrame / this.fps) * 1e6
+              timestamp: timestampUs
             });
 
             videoEncoder.encode(videoFrame, { keyFrame: currentFrame % 30 === 0 });

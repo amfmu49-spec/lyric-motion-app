@@ -312,7 +312,11 @@ function App() {
         }
       }
 
-      const options = selectedMime ? { mimeType: selectedMime } : undefined;
+      const options: MediaRecorderOptions = {
+        mimeType: selectedMime || undefined,
+        videoBitsPerSecond: 5_000_000,
+        audioBitsPerSecond: 128_000
+      };
       const mediaRecorder = new MediaRecorder(stream, options);
       mediaRecorderRef.current = mediaRecorder;
 
@@ -638,7 +642,7 @@ function App() {
             <h1 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               <span>Lyric Motion Creator</span>
               <span style={{ fontSize: '0.7rem', padding: '0.15rem 0.5rem', backgroundColor: 'var(--primary-color, #3498db)', color: '#fff', borderRadius: '12px', fontWeight: 'bold' }}>
-                v2.3.3
+                v2.4.0
               </span>
             </h1>
             <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)' }}>Android Ready</span>
@@ -968,12 +972,12 @@ function App() {
 
           <div style={{ marginTop: '1rem', paddingTop: '0.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', textAlign: 'center' }}>
             <details style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.6)', cursor: 'pointer' }}>
-              <summary>ℹ️ バージョン情報 (v2.3.3)</summary>
+              <summary>ℹ️ バージョン情報 (v2.4.0)</summary>
               <div style={{ marginTop: '0.4rem', textAlign: 'left', padding: '0.5rem', backgroundColor: 'rgba(0,0,0,0.3)', borderRadius: '6px', fontSize: '0.7rem', lineHeight: '1.5' }}>
-                <strong>v2.3.3 主な機能・更新点:</strong><br />
-                • 🎬 動画生成機能（WebCodecsデコードのサスペンド）の安定性向上・修正<br />
-                • 🏷️ Sunoブックマークレットでセクション名（`[Intro]`, `(Chorus)`等）を歌詞から自動除外<br />
-                • 🎬 ケンバーンズ効果の切替時カクつき・ワープの完全数学的解決
+                <strong>v2.4.0 主な機能・更新点:</strong><br />
+                • 📱 MP4コンテナ標準規格の厳密適用 (FastStart moov-at-front / Durationミリ秒正確補正 / 完全CFR固定フレームレート)<br />
+                • 🔤 縦書き表示時のカギ括弧・括弧類（「」『』（）[]【】等）の自動回転＆アライメント位置ズレ全自動補正<br />
+                • 🎬 Android端末MediaRecorderフォールバックのビッドレート＆互換性最適化
               </div>
             </details>
           </div>

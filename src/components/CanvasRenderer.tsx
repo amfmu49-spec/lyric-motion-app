@@ -741,13 +741,30 @@ export const CanvasRenderer = forwardRef<CanvasRendererRef, Props>(({
             ctx.lineWidth = size * 0.12;
             ctx.strokeStyle = 'rgba(0,0,0,0.4)';
 
-            // If Vertical mode and Chouon (long dash), rotate character 90 degrees
-            if (isVertical && isChouon) {
+            // If Vertical mode and Chouon/Brackets/Punctuation, rotate character 90 degrees with position correction
+            const KAKKO_REGEX = /[「」『』（）()\[\]【】＜＞<>{}｛｝]/;
+            const isKakko = KAKKO_REGEX.test(c);
+            const isRotateChar = isChouon || isKakko || c === '〜' || c === '~' || c === '…' || c === 'ー' || c === '-';
+
+            if (isVertical && isRotateChar) {
               ctx.save();
               ctx.translate(drawX, drawY);
               ctx.rotate(Math.PI / 2);
-              ctx.strokeText(c, 0, 0);
-              ctx.fillText(c, 0, 0);
+              
+              let offsetX = 0;
+              let offsetY = 0;
+
+              // Fine-tune offsets for opening and closing brackets when rotated 90 degrees
+              if (c === '「' || c === '『' || c === '（' || c === '(' || c === '【' || c === '[' || c === '＜' || c === '<') {
+                offsetY = -size * 0.15;
+                offsetX = size * 0.15;
+              } else if (c === '」' || c === '』' || c === '）' || c === ')' || c === '】' || c === ']' || c === '＞' || c === '>') {
+                offsetY = size * 0.15;
+                offsetX = -size * 0.15;
+              }
+
+              ctx.strokeText(c, offsetX, offsetY);
+              ctx.fillText(c, offsetX, offsetY);
               ctx.restore();
             } else {
               ctx.strokeText(c, drawX, drawY);
